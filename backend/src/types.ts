@@ -17,6 +17,20 @@ export type LanguageCode = (typeof LANGUAGE_CODES)[number];
 export type SellerRole = "seller" | "buyer";
 export const PRODUCT_STATUSES = ["active", "sold_out", "archived"] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
+export const DIRECT_PRODUCT_MANAGEMENT_ACTIONS = [
+  "show_actions",
+  "edit_price",
+  "edit_quantity",
+  "edit_details",
+  "improve_details",
+  "replace_photo",
+  "remove",
+  "archive",
+  "restore",
+  "sold_out",
+  "restock",
+] as const;
+export type DirectProductManagementAction = (typeof DIRECT_PRODUCT_MANAGEMENT_ACTIONS)[number];
 
 /**
  * Fields a seller may change on one of their own published products.
@@ -72,9 +86,11 @@ export interface DraftListing {
     /** Zero-based page for a long seller-owned listing picker. */
     productListPage?: number;
     actionListMessageId?: string;
-    confirmationMessageId?: string;
-    selectedProductId?: string;
-    action?:
+      confirmationMessageId?: string;
+      selectedProductId?: string;
+      /** Product revision observed when this management state was created. */
+      expectedProductUpdatedAt?: string;
+      action?:
       | "edit_price"
       | "edit_quantity"
       | "edit_details"
@@ -84,6 +100,11 @@ export interface DraftListing {
       | "sold_out"
       | "restock";
     pendingPatch?: SellerProductPatch;
+    /** A spoken/typed request retained while the seller chooses an ambiguous product. */
+    directRequest?: {
+      action: DirectProductManagementAction;
+      patch?: SellerProductPatch;
+    };
   };
 }
 

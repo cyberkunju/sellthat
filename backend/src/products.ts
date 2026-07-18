@@ -157,6 +157,41 @@ export async function markSellerVerified(phone: string): Promise<Seller | null> 
   return rows[0] ? asSeller(rows[0]) : null;
 }
 
+/**
+ * Full demo reset for one seller: clear their verified state and delete all of
+ * their products plus the listing images those products referenced. Products
+ * are deleted before their images because products.image_id has no ON DELETE
+ * rule. Scoped to a single phone and triggered only by that seller's own reset.
+ */
+export async function resetSellerData(phone: string): Promise<void> {
+  const parsedPhone = SellerPhoneSchema.safeParse(phone);
+  if (!parsedPhone.success) return;
+
+  await sql.begin(async (transaction) => {
+    const rows = await transaction<{ id: string }[]>`
+      update sellers
+      set is_verified = false, updated_at = now()
+      where phone = ${parsedPhone.data}
+      returning id::text as id
+    `;
+    const seller = rows[0];
+    if (!seller) return;
+
+    const imageRows = await transaction<{ imageId: string }[]>`
+      select image_id::text as "imageId"
+      from products
+      where seller_id = ${seller.id}::uuid and image_id is not null
+    `;
+    const imageIds = imageRows.map((row) => row.imageId);
+
+    await transaction`delete from products where seller_id = ${seller.id}::uuid`;
+
+    if (imageIds.length > 0) {
+      await transaction`delete from images where id = any(${imageIds}::uuid[])`;
+    }
+  });
+}
+
 export async function storeImage(bytes: Uint8Array, mime: string): Promise<string> {
   const rows = await sql<{ id: string }[]>`
     insert into images (mime, bytes)
@@ -327,11 +362,17 @@ export async function updateSellerProduct(
   phone: string,
   id: string,
   patch: unknown,
+  expectedUpdatedAt?: string,
 ): Promise<PublicProduct | null> {
   const parsedPhone = SellerPhoneSchema.safeParse(phone);
   const parsedId = ProductIdSchema.safeParse(id);
   const parsedPatch = SellerProductPatchSchema.safeParse(patch);
   if (!parsedPhone.success || !parsedId.success || !parsedPatch.success) return null;
+
+  const expectedDate = expectedUpdatedAt === undefined
+    ? null
+    : validTimestamp(expectedUpdatedAt);
+  if (expectedUpdatedAt !== undefined && expectedDate === null) return null;
 
   const data = parsedPatch.data;
   const hasTitle = data.title !== undefined;
@@ -342,6 +383,8 @@ export async function updateSellerProduct(
   const hasImageId = data.imageId !== undefined;
   const hasStatus = data.status !== undefined;
   const imageId = data.imageId ?? null;
+  const hasExpectedUpdatedAt = expectedDate !== null;
+  const expectedUpdatedAtValue = expectedDate ?? new Date(0);
 
   const rows = await sql<ProductRow[]>`
     update products p
@@ -358,6 +401,10 @@ export async function updateSellerProduct(
     where p.seller_id = s.id
       and s.phone = ${parsedPhone.data}
       and p.id = ${parsedId.data}::uuid
+      and (
+        not ${hasExpectedUpdatedAt}
+        or p.updated_at = ${expectedUpdatedAtValue}
+      )
       and (
         ${!hasImageId || imageId === null}
         or exists (
@@ -382,6 +429,11 @@ export async function updateSellerProduct(
   `;
 
   return rows[0] ? asPublicProduct(rows[0]) : null;
+}
+
+function validTimestamp(value: string): Date | null {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.valueOf()) ? null : parsed;
 }
 
 /**
