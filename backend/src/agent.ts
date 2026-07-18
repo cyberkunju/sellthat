@@ -1212,9 +1212,13 @@ async function materializeTurn(
   const content = message.text?.trim() ?? "";
   const selectedLanguage = languageFromButton(message.buttonId);
   const explicitLanguage = explicitLanguageFromText(content);
-  const language = selectedLanguage ?? explicitLanguage ?? (content
-    ? await detectLanguage(content, { sessionLanguage })
-    : sessionLanguage ?? DEFAULT_LANGUAGE);
+  const language = selectedLanguage ?? explicitLanguage ?? (
+    message.buttonId !== undefined && sessionLanguage !== undefined
+      ? sessionLanguage
+      : content
+        ? await detectLanguage(content, { sessionLanguage })
+        : sessionLanguage ?? DEFAULT_LANGUAGE
+  );
   return { content, language, failedMedia: false };
 }
 
