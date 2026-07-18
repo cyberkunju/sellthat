@@ -80,17 +80,19 @@ describe("detectScriptLanguage", () => {
 });
 
 describe("detectLanguage", () => {
-  it("lets text-lid recognize a Romanized language switch over a saved language", async () => {
+  it("keeps the saved language for a Latin product caption (no text-lid flip)", async () => {
+    // A Latin product name must never flip the seller's chosen language, even
+    // if Sarvam text-lid would guess an unrelated language for it.
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response(
-      JSON.stringify({ language_code: "hi-IN" }),
+      JSON.stringify({ language_code: "ta-IN" }),
       { status: 200, headers: { "content-type": "application/json" } },
     )) as unknown as typeof globalThis.fetch;
 
     try {
       await expect(
-        detectLanguage("namaste, mujhe product bechna hai", { sessionLanguage: "ta-IN" }),
-      ).resolves.toBe("hi-IN");
+        detectLanguage("Omen laptop", { sessionLanguage: "ml-IN" }),
+      ).resolves.toBe("ml-IN");
     } finally {
       globalThis.fetch = originalFetch;
     }

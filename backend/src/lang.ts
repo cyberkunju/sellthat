@@ -197,10 +197,11 @@ export function detectScriptLanguage(text: string): LanguageCode | null {
 }
 
 /**
- * Script-first language detection for the eleven supported languages. Only Latin and Devanagari
- * are sent to Sarvam text-lid. A saved language is a resilient fallback for Romanized turns, not
- * a lock: text-lid may still recognize an explicit "Tamil", "Bangla", or Romanized language
- * switch the seller typed.
+ * Script-first language detection for the eleven supported languages. Latin text keeps the
+ * seller's chosen language (or the default on first contact) and is never sent to text-lid,
+ * because short English strings such as product names get misread as unrelated languages.
+ * Only Devanagari is sent to Sarvam text-lid, and only to disambiguate Hindi from Marathi.
+ * Deliberate language switches come from the picker and from explicitLanguageFromText.
  */
 export async function detectLanguage(
   text: string,
@@ -210,11 +211,17 @@ export async function detectLanguage(
     const scriptLanguage = detectScriptLanguage(text);
     if (!scriptLanguage) return options.sessionLanguage ?? DEFAULT_LANGUAGE;
 
-    const resolveAmbiguity = options.resolveAmbiguity ?? true;
-    if (scriptLanguage === "en-IN" && options.sessionLanguage && !resolveAmbiguity) {
-      return options.sessionLanguage;
+    // Latin/romanized text is inherently ambiguous, and Sarvam text-lid often
+    // misreads a short English string (a product name like "Omen laptop") as an
+    // unrelated Indian language. Never let it override the seller's chosen
+    // language: keep the saved one, or default on first contact. Explicit
+    // switches come from the language picker and from explicitLanguageFromText,
+    // which matches spelled-out language names ("Tamil", "Bangla", ...).
+    if (scriptLanguage === "en-IN") {
+      return options.sessionLanguage ?? DEFAULT_LANGUAGE;
     }
 
+    const resolveAmbiguity = options.resolveAmbiguity ?? true;
     const isAmbiguous = scriptLanguage === "hi-IN" || !hasIndianScript(text);
     if (!resolveAmbiguity || !isAmbiguous) return scriptLanguage;
 
