@@ -44,3 +44,44 @@ create table if not exists sessions (
   history jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
 );
+
+-- A deterministic fallback keeps a fresh marketplace useful for demos before
+-- the first verified WhatsApp seller publishes a listing.
+insert into sellers (phone, name, location, language, is_verified)
+values ('seed:demo-seller', 'SellThat Demo Seller', 'Bengaluru', 'en-IN', true)
+on conflict (phone) do update
+  set name = excluded.name,
+      location = excluded.location,
+      language = excluded.language,
+      is_verified = excluded.is_verified,
+      updated_at = now();
+
+insert into products (
+  seller_id,
+  title,
+  description,
+  price,
+  quantity,
+  category,
+  seller_name,
+  seller_location,
+  language
+)
+select
+  seller.id,
+  'Handwoven Cotton Tote Bag',
+  'A sturdy everyday tote handwoven by a local seller.',
+  499,
+  5,
+  'Bags',
+  seller.name,
+  seller.location,
+  seller.language
+from sellers as seller
+where seller.phone = 'seed:demo-seller'
+  and not exists (
+    select 1
+    from products
+    where seller_id = seller.id
+      and title = 'Handwoven Cotton Tote Bag'
+  );
