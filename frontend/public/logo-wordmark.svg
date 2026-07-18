@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" role="img" aria-label="SellThat">
+  <path d="M24 24C24 12.5 19.5 5 11.5 5 6.8 5 4 8.5 4 13.5 4 20.5 10.5 24 24 24Z" fill="#1c1917"/>
+  <path d="M24 24C24 35.5 28.5 43 36.5 43 41.2 43 44 39.5 44 34.5 44 27.5 37.5 24 24 24Z" fill="#265ffb"/>
+  <text x="56" y="33" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="30" font-weight="800" letter-spacing="-1">
+    <tspan fill="#1c1917">Sell</tspan><tspan fill="#265ffb">That</tspan>
+  </text>
+</svg>
