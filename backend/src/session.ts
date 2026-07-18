@@ -57,13 +57,37 @@ const SessionPatchSchema = z.object({
   draft: z.record(z.string(), z.unknown()).optional(),
   history: z.array(SessionHistoryTurnSchema).optional(),
 });
+function jsonParam(value: unknown) {
+  // Both draft and history are plain JSON data; sql.json() is the correct way
+  // to bind a jsonb value in postgres.js. Casting from unknown avoids the
+  // structural overlap error TS raises when narrowing arrays to JSONValue.
+  return sql.json(value as Parameters<typeof sql.json>[0]);
+}
+
+function parseJsonColumn(value: unknown): unknown {
+  // jsonb columns normally arrive already parsed. Tolerate a JSON string too,
+  // so any legacy double-encoded row self-heals instead of failing to parse.
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+const DraftColumnSchema = z.preprocess(parseJsonColumn, z.record(z.string(), z.unknown()));
+const HistoryColumnSchema = z.preprocess(
+  parseJsonColumn,
+  z.array(SessionHistoryTurnSchema),
+);
+
 const SessionRowSchema = z.object({
   phone: PhoneSchema,
   stage: SessionStageSchema,
   language: z.string().nullable(),
   role: SessionRoleSchema.nullable(),
-  draft: z.record(z.string(), z.unknown()),
-  history: z.array(SessionHistoryTurnSchema),
+  draft: DraftColumnSchema,
+  history: HistoryColumnSchema,
   updated_at: z.coerce.date(),
 });
 
@@ -128,16 +152,6 @@ export async function getSession(phone: string): Promise<Session> {
   return existing ?? createSession(normalizedPhone);
 }
 
-function serializeJson(value: unknown): string {
-  const serialized = JSON.stringify(value);
-
-  if (serialized === undefined) {
-    throw new Error("Session JSON value could not be serialized.");
-  }
-
-  return serialized;
-}
-
 export async function saveSession(
   phone: string,
   patch: SessionPatch,
@@ -160,8 +174,8 @@ export async function saveSession(
       stage = ${next.stage},
       language = ${next.language},
       role = ${next.role},
-      draft = ${serializeJson(next.draft)}::jsonb,
-      history = ${serializeJson(next.history)}::jsonb,
+      draft = ${jsonParam(next.draft)},
+      history = ${jsonParam(next.history)},
       updated_at = now()
     where phone = ${normalizedPhone}
     returning phone, stage, language, role, draft, history, updated_at
