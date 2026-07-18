@@ -76,7 +76,7 @@ export function parseWebhookPayload(payload: unknown): ParsedWebhookPayload {
         continue;
       }
 
-      const namesByPhone = contactNames(value.contacts);
+      const namesByPhone = contactNames(value);
 
       // Intentionally inspect only value.messages. Meta's value.statuses is
       // delivery bookkeeping, not a new seller turn.
@@ -236,10 +236,16 @@ function normaliseMessage(
   }
 }
 
+/** Read sender names from Meta's change.value.contacts array. */
 function contactNames(value: unknown): Map<string, string> {
   const names = new Map<string, string>();
+  const changeValue = asRecord(value);
 
-  for (const contactValue of asArray(value)) {
+  if (changeValue === null) {
+    return names;
+  }
+
+  for (const contactValue of asArray(changeValue.contacts)) {
     const contact = asRecord(contactValue);
     if (contact === null) {
       continue;

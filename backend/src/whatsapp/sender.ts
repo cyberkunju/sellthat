@@ -5,6 +5,18 @@ export const WHATSAPP_REQUEST_TIMEOUT_MS = 8_000;
 export const MAX_TEXT_CHARACTERS = 4_096;
 export const MAX_BUTTON_BODY_CHARACTERS = 1_024;
 export const MAX_BUTTON_TITLE_CHARACTERS = 20;
+// Meta interactive list limits: one button label, up to 10 rows across all
+// sections, and per-field caps. See interactive-list-messages docs.
+export const MAX_LIST_BUTTON_CHARACTERS = 20;
+/** Backward-compatible wording for the list action's `button` field. */
+export const MAX_LIST_ACTION_LABEL_CHARACTERS = MAX_LIST_BUTTON_CHARACTERS;
+export const MAX_LIST_SECTION_TITLE_CHARACTERS = 24;
+export const MAX_LIST_ROW_TITLE_CHARACTERS = 24;
+export const MAX_LIST_ROW_DESCRIPTION_CHARACTERS = 72;
+export const MAX_LIST_ROW_ID_CHARACTERS = 200;
+export const MAX_LIST_SECTIONS = 10;
+export const MAX_LIST_ROWS = 10;
+export const MAX_LIST_HEADER_FOOTER_CHARACTERS = 60;
 
 export const FIXED_BUTTON_IDS = [
   "lang_en-IN",
@@ -15,6 +27,9 @@ export const FIXED_BUTTON_IDS = [
   "verify_yes",
   "confirm_yes",
   "confirm_edit",
+  "seller_new_listing",
+  "seller_manage_listings",
+  "seller_change_language",
 ] as const;
 
 export type FixedButtonId = (typeof FIXED_BUTTON_IDS)[number];
@@ -24,6 +39,36 @@ export interface ReplyButton {
   id: string;
   title: string;
 }
+
+export interface ListRow {
+  /** Echoed back in the webhook as interactive.list_reply.id. */
+  id: string;
+  title: string;
+  description?: string;
+}
+
+export interface ListSection {
+  title?: string;
+  rows: readonly ListRow[];
+}
+
+/**
+ * An interactive list message. The single button reveals a modal of rows the
+ * user taps to select, which is how the seller flow offers more than three
+ * choices (WhatsApp reply buttons cap at three; a list holds up to ten rows).
+ */
+export interface InteractiveList {
+  body: string;
+  button: string;
+  header?: string;
+  footer?: string;
+  sections: readonly ListSection[];
+}
+
+/** Aliases retained for callers written against the first sender draft. */
+export type ReplyListRow = ListRow;
+export type ReplyListSection = ListSection;
+export type ReplyList = InteractiveList;
 
 export interface WhatsAppSendResult {
   ok: boolean;
@@ -57,8 +102,10 @@ export interface WhatsAppSenderOptions {
 }
 
 export interface ReplyResult {
-  /** Text, or an interactive button message when buttons were supplied. */
+  /** The plain text message that is always attempted first. */
   text: WhatsAppSendResult;
+  /** The one requested button or list interaction, after the text message. */
+  interactive: WhatsAppSendResult | null;
   /** Null means TTS was unavailable; the text response still went out. */
   voice: WhatsAppSendResult | null;
 }
@@ -69,6 +116,7 @@ export interface WhatsAppSenderClient {
     to: string,
     message: { body: string; buttons: readonly ReplyButton[] },
   ): Promise<WhatsAppSendResult>;
+  sendList(to: string, list: ReplyList): Promise<WhatsAppSendResult>;
   uploadMedia(bytes: Uint8Array, mime: string, filename: string): Promise<string | null>;
   sendVoiceNote(to: string, mp3Bytes: Uint8Array): Promise<WhatsAppSendResult>;
   markRead(messageId: string, typing?: boolean): Promise<void>;
@@ -77,6 +125,7 @@ export interface WhatsAppSenderClient {
     text: string,
     language: LanguageCode,
     buttons?: readonly ReplyButton[],
+    list?: ReplyList,
   ): Promise<ReplyResult>;
 }
 
@@ -137,6 +186,41 @@ export class WhatsAppSender implements WhatsAppSenderClient {
           buttons: buttons.map((button) => ({
             type: "reply" as const,
             reply: { id: button.id, title: button.title },
+          })),
+        },
+      },
+    });
+  }
+
+  /** Send a fully validated Meta interactive list message. */
+  public async sendList(to: string, list: ReplyList): Promise<WhatsAppSendResult> {
+    const recipient = validRecipient(to);
+    const message = normaliseList(list);
+
+    if (recipient === null || message === null) {
+      return { ok: false, errorCode: "invalid_list_message" };
+    }
+
+    return this.postMessages({
+      messaging_product: "whatsapp",
+      to: recipient,
+      type: "interactive",
+      interactive: {
+        type: "list",
+        ...(message.header === undefined
+          ? {}
+          : { header: { type: "text", text: message.header } }),
+        body: { text: message.body },
+        ...(message.footer === undefined ? {} : { footer: { text: message.footer } }),
+        action: {
+          button: message.button,
+          sections: message.sections.map((section) => ({
+            ...(section.title === undefined ? {} : { title: section.title }),
+            rows: section.rows.map((row) => ({
+              id: row.id,
+              title: row.title,
+              ...(row.description === undefined ? {} : { description: row.description }),
+            })),
           })),
         },
       },
@@ -236,49 +320,85 @@ export class WhatsAppSender implements WhatsAppSenderClient {
   }
 
   /**
-   * The mandatory outbound path: visual text first, then Sarvam's mp3 voice
-   * note. Interactive buttons count as the visual text message when supplied.
+   * The mandatory outbound path: plain text first, one optional interactive
+   * choice next, then Sarvam's mp3 voice note. The separate text message is
+   * intentional: it remains readable even when an old client cannot render an
+   * interactive control.
    */
   public async reply(
     to: string,
     text: string,
     language: LanguageCode,
     buttons?: readonly ReplyButton[],
+    list?: ReplyList,
   ): Promise<ReplyResult> {
     let textResult: WhatsAppSendResult;
 
     try {
-      if (buttons !== undefined && buttons.length > 0 && validButtons(buttons)) {
-        textResult = await this.sendButtons(to, { body: text, buttons });
-      } else {
-        // Invalid optional buttons must not prevent the universal text reply.
-        textResult = await this.sendText(to, text);
-      }
+      textResult = await this.sendText(to, text);
     } catch (error: unknown) {
       this.log(`text reply failed (${failureReason(error)})`);
       textResult = { ok: false, errorCode: "send_failed" };
     }
 
+    const interactive = await this.sendOptionalInteractive(to, text, buttons, list);
+
     if (this.options.speak === undefined) {
       this.log("voice reply skipped because no speech provider was configured");
-      return { text: textResult, voice: null };
+      return { text: textResult, interactive, voice: null };
     }
 
     try {
       const speech = await this.options.speak(truncate(text, MAX_TEXT_CHARACTERS), language);
       if (speech === null || speech.mp3Bytes.byteLength === 0) {
         this.log("voice reply synthesis was unavailable");
-        return { text: textResult, voice: null };
+        return { text: textResult, interactive, voice: null };
       }
 
-      // Awaiting this after the text send preserves the required send order.
+      // Awaiting this after text and interactive sends preserves send order.
       const voice = await this.sendVoiceNote(to, speech.mp3Bytes);
-      return { text: textResult, voice };
+      return { text: textResult, interactive, voice };
     } catch (error: unknown) {
       // A provider implementation must not be able to surface an exception to
       // the webhook. Text is already sent at this point.
       this.log(`voice reply synthesis failed (${failureReason(error)})`);
-      return { text: textResult, voice: null };
+      return { text: textResult, interactive, voice: null };
+    }
+  }
+
+  /**
+   * A reply may carry one selection control at most. Buttons take precedence
+   * when an accidental caller supplies both, which keeps older button callers
+   * backward-compatible while preventing two interactive messages per turn.
+   */
+  private async sendOptionalInteractive(
+    to: string,
+    text: string,
+    buttons: readonly ReplyButton[] | undefined,
+    list: ReplyList | undefined,
+  ): Promise<WhatsAppSendResult | null> {
+    const hasButtons = buttons !== undefined && buttons.length > 0;
+    const hasList = list !== undefined;
+
+    if (!hasButtons && !hasList) {
+      return null;
+    }
+
+    if (hasButtons && hasList) {
+      this.log("both buttons and a list were requested; sending buttons only");
+    }
+
+    try {
+      if (buttons !== undefined && buttons.length > 0) {
+        return await this.sendButtons(to, { body: text, buttons });
+      }
+
+      // `hasList` means list is defined; this narrowing is retained for
+      // TypeScript's strict optional-property analysis.
+      return list === undefined ? null : await this.sendList(to, list);
+    } catch (error: unknown) {
+      this.log(`interactive reply failed (${failureReason(error)})`);
+      return { ok: false, errorCode: "send_failed" };
     }
   }
 
@@ -370,6 +490,90 @@ function validButtons(buttons: readonly ReplyButton[]): boolean {
 
     return valid;
   });
+}
+
+function normaliseList(value: ReplyList): ReplyList | null {
+  const body = truncate(value.body, MAX_BUTTON_BODY_CHARACTERS);
+  const button = value.button.trim();
+  const header = value.header === undefined ? undefined : value.header.trim();
+  const footer = value.footer === undefined ? undefined : value.footer.trim();
+
+  if (
+    body.length === 0 ||
+    button.length === 0 ||
+    characterLength(button) > MAX_LIST_BUTTON_CHARACTERS ||
+    (header !== undefined &&
+      (header.length === 0 ||
+        characterLength(header) > MAX_LIST_HEADER_FOOTER_CHARACTERS)) ||
+    (footer !== undefined &&
+      (footer.length === 0 ||
+        characterLength(footer) > MAX_LIST_HEADER_FOOTER_CHARACTERS)) ||
+    value.sections.length === 0 ||
+    value.sections.length > MAX_LIST_SECTIONS
+  ) {
+    return null;
+  }
+
+  const rowIds = new Set<string>();
+  let totalRows = 0;
+  const sections: ListSection[] = [];
+
+  for (const sourceSection of value.sections) {
+    const title = sourceSection.title === undefined
+      ? undefined
+      : sourceSection.title.trim();
+
+    if (
+      (title !== undefined &&
+        (title.length === 0 ||
+          characterLength(title) > MAX_LIST_SECTION_TITLE_CHARACTERS)) ||
+      sourceSection.rows.length === 0
+    ) {
+      return null;
+    }
+
+    const rows: ListRow[] = [];
+    for (const sourceRow of sourceSection.rows) {
+      const id = sourceRow.id.trim();
+      const rowTitle = sourceRow.title.trim();
+      const description = sourceRow.description?.trim();
+
+      if (
+        id.length === 0 ||
+        characterLength(id) > MAX_LIST_ROW_ID_CHARACTERS ||
+        rowTitle.length === 0 ||
+        characterLength(rowTitle) > MAX_LIST_ROW_TITLE_CHARACTERS ||
+        (description !== undefined &&
+          description.length > 0 &&
+          characterLength(description) > MAX_LIST_ROW_DESCRIPTION_CHARACTERS) ||
+        rowIds.has(id)
+      ) {
+        return null;
+      }
+
+      totalRows += 1;
+      if (totalRows > MAX_LIST_ROWS) {
+        return null;
+      }
+
+      rowIds.add(id);
+      rows.push({
+        id,
+        title: rowTitle,
+        ...(description === undefined || description.length === 0 ? {} : { description }),
+      });
+    }
+
+    sections.push({ ...(title === undefined ? {} : { title }), rows });
+  }
+
+  return {
+    body,
+    button,
+    ...(header === undefined ? {} : { header }),
+    ...(footer === undefined ? {} : { footer }),
+    sections,
+  };
 }
 
 function truncate(value: string, maximumCharacters: number): string {

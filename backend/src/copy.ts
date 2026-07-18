@@ -1,4 +1,5 @@
 import type { LanguageCode, ReplyButton } from "./types";
+import type { ReplyList, ReplyListRow } from "./whatsapp/sender";
 
 type CopyKey =
   | "welcome"
@@ -239,25 +240,98 @@ export function languageButtons(): ReplyButton[] {
   return [
     { id: "lang_en-IN", title: "English" },
     { id: "lang_hi-IN", title: "हिंदी" },
-    { id: "lang_more", title: "More languages" },
+    { id: "lang_more", title: "All languages" },
   ];
 }
 
 export function moreLanguagesPrompt(language: LanguageCode): string {
-  const prefixes: Record<LanguageCode, string> = {
-    "en-IN": "Reply with your preferred language name, or send a voice note in it:",
-    "hi-IN": "अपनी पसंदीदा भाषा का नाम लिखें या उसमें वॉइस नोट भेजें:",
-    "bn-IN": "আপনার পছন্দের ভাষার নাম লিখুন বা সেই ভাষায় ভয়েস নোট পাঠান:",
-    "te-IN": "మీకు నచ్చిన భాష పేరు టైప్ చేయండి లేదా ఆ భాషలో వాయిస్ నోట్ పంపండి:",
-    "mr-IN": "तुमच्या पसंतीच्या भाषेचे नाव लिहा किंवा त्या भाषेत व्हॉइस नोट पाठवा:",
-    "ta-IN": "உங்கள் விருப்பமான மொழியின் பெயரை எழுதுங்கள் அல்லது அந்த மொழியில் குரல் குறிப்பை அனுப்புங்கள்:",
-    "gu-IN": "તમારી પસંદગીની ભાષાનું નામ લખો અથવા તે ભાષામાં વૉઇસ નોટ મોકલો:",
-    "kn-IN": "ನಿಮ್ಮ ಆದ್ಯತೆಯ ಭಾಷೆಯ ಹೆಸರನ್ನು ಬರೆಯಿರಿ ಅಥವಾ ಆ ಭಾಷೆಯಲ್ಲಿ ಧ್ವನಿ ಟಿಪ್ಪಣಿ ಕಳುಹಿಸಿ:",
-    "ml-IN": "നിങ്ങൾക്ക് ഇഷ്ടമുള്ള ഭാഷയുടെ പേര് എഴുതുക അല്ലെങ്കിൽ ആ ഭാഷയിൽ വോയ്സ് നോട്ട് അയയ്ക്കുക:",
-    "pa-IN": "ਆਪਣੀ ਪਸੰਦੀਦਾ ਭਾਸ਼ਾ ਦਾ ਨਾਮ ਲਿਖੋ ਜਾਂ ਉਸ ਭਾਸ਼ਾ ਵਿੱਚ ਵੌਇਸ ਨੋਟ ਭੇਜੋ:",
-    "or-IN": "ଆପଣଙ୍କ ପସନ୍ଦର ଭାଷାର ନାମ ଲେଖନ୍ତୁ କିମ୍ବା ସେହି ଭାଷାରେ ଭଏସ୍ ନୋଟ୍ ପଠାନ୍ତୁ:",
+  return moreLanguagesList(language).body;
+}
+
+type MoreLanguageListLabels = Readonly<{
+  body: string;
+  button: string;
+  sectionTitle: string;
+}>;
+
+const MORE_LANGUAGE_LIST_LABELS: Record<LanguageCode, MoreLanguageListLabels> = {
+  "en-IN": {
+    body: "Choose a language from the list.",
+    button: "Choose language",
+    sectionTitle: "Languages",
+  },
+  "hi-IN": {
+    body: "सूची से भाषा चुनें।",
+    button: "भाषा चुनें",
+    sectionTitle: "भाषाएँ",
+  },
+  "bn-IN": {
+    body: "তালিকা থেকে ভাষা বেছে নিন।",
+    button: "ভাষা বাছুন",
+    sectionTitle: "ভাষা",
+  },
+  "te-IN": {
+    body: "జాబితా నుంచి భాష ఎంచుకోండి.",
+    button: "భాష ఎంచుకోండి",
+    sectionTitle: "భాషలు",
+  },
+  "mr-IN": {
+    body: "यादीतून भाषा निवडा.",
+    button: "भाषा निवडा",
+    sectionTitle: "भाषा",
+  },
+  "ta-IN": {
+    body: "பட்டியலில் மொழியைத் தேர்வு செய்க.",
+    button: "மொழி தேர்வு",
+    sectionTitle: "மொழிகள்",
+  },
+  "gu-IN": {
+    body: "યાદીમાંથી ભાષા પસંદ કરો.",
+    button: "ભાષા પસંદ કરો",
+    sectionTitle: "ભાષાઓ",
+  },
+  "kn-IN": {
+    body: "ಪಟ್ಟಿಯಿಂದ ಭಾಷೆ ಆಯ್ಕೆಮಾಡಿ.",
+    button: "ಭಾಷೆ ಆಯ್ಕೆ",
+    sectionTitle: "ಭಾಷೆಗಳು",
+  },
+  "ml-IN": {
+    body: "പട്ടികയിൽ നിന്ന് ഭാഷ തിരഞ്ഞെടുക്കുക.",
+    button: "ഭാഷ തിരഞ്ഞെടുക്കുക",
+    sectionTitle: "ഭാഷകൾ",
+  },
+  "pa-IN": {
+    body: "ਸੂਚੀ ਵਿੱਚੋਂ ਭਾਸ਼ਾ ਚੁਣੋ।",
+    button: "ਭਾਸ਼ਾ ਚੁਣੋ",
+    sectionTitle: "ਭਾਸ਼ਾਵਾਂ",
+  },
+  "or-IN": {
+    body: "ତାଲିକାରୁ ଭାଷା ବାଛନ୍ତୁ।",
+    button: "ଭାଷା ବାଛନ୍ତୁ",
+    sectionTitle: "ଭାଷା",
+  },
+};
+
+const MORE_LANGUAGE_ROWS: readonly ReplyListRow[] = [
+  { id: "lang_bn-IN", title: "বাংলা" },
+  { id: "lang_te-IN", title: "తెలుగు" },
+  { id: "lang_mr-IN", title: "मराठी" },
+  { id: "lang_ta-IN", title: "தமிழ்" },
+  { id: "lang_gu-IN", title: "ગુજરાતી" },
+  { id: "lang_kn-IN", title: "ಕನ್ನಡ" },
+  { id: "lang_ml-IN", title: "മലയാളം" },
+  { id: "lang_pa-IN", title: "ਪੰਜਾਬੀ" },
+  { id: "lang_or-IN", title: "ଓଡ଼ିଆ" },
+];
+
+/** The remaining supported languages, all selectable without typing. */
+export function moreLanguagesList(language: LanguageCode): ReplyList {
+  const labels = MORE_LANGUAGE_LIST_LABELS[language];
+  return {
+    body: labels.body,
+    button: labels.button,
+    sections: [{ title: labels.sectionTitle, rows: MORE_LANGUAGE_ROWS }],
   };
-  return `${prefixes[language]}\nEnglish, Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Punjabi, Odia.`;
 }
 
 export function roleButtons(language: LanguageCode): ReplyButton[] {
@@ -281,8 +355,270 @@ export function roleButtons(language: LanguageCode): ReplyButton[] {
   ];
 }
 
-export function verifyButtons(): ReplyButton[] {
-  return [{ id: "verify_yes", title: "Verify me" }];
+export function verifyButtons(language: LanguageCode = "en-IN"): ReplyButton[] {
+  const titles: Record<LanguageCode, string> = {
+    "en-IN": "Verify me",
+    "hi-IN": "सत्यापित करें",
+    "bn-IN": "যাচাই করুন",
+    "te-IN": "ధృవీకరించండి",
+    "mr-IN": "सत्यापित करा",
+    "ta-IN": "சரிபார்க்கவும்",
+    "gu-IN": "ચકાસો",
+    "kn-IN": "ಪರಿಶೀಲಿಸಿ",
+    "ml-IN": "പരിശോധിക്കുക",
+    "pa-IN": "ਤਸਦੀਕ ਕਰੋ",
+    "or-IN": "ଯାଞ୍ଚ କରନ୍ତୁ",
+  };
+  return [{ id: "verify_yes", title: titles[language] }];
+}
+
+type SellerManagementCopyKey =
+  | "sellerMenuPrompt"
+  | "managePrompt"
+  | "noListings"
+  | "chooseListing"
+  | "chooseAction"
+  | "editPricePrompt"
+  | "editQuantityPrompt"
+  | "editDetailsPrompt"
+  | "replacePhotoPrompt"
+  | "saveChangesPrompt"
+  | "changesSaved"
+  | "listingStatusUpdated";
+
+type SellerManagementCopy = Record<SellerManagementCopyKey, string>;
+
+const SELLER_MENU_TITLES: Record<LanguageCode, readonly [string, string, string]> = {
+  "en-IN": ["New listing", "My listings", "Language"],
+  "hi-IN": ["नई सूची", "मेरी सूचियाँ", "भाषा बदलें"],
+  "bn-IN": ["নতুন তালিকা", "আমার তালিকা", "ভাষা বদলান"],
+  "te-IN": ["కొత్త జాబితా", "నా జాబితాలు", "భాష మార్చండి"],
+  "mr-IN": ["नवीन सूची", "माझ्या सूची", "भाषा बदला"],
+  "ta-IN": ["புதிய பட்டியல்", "என் பட்டியல்கள்", "மொழி மாற்று"],
+  "gu-IN": ["નવી સૂચિ", "મારી સૂચિઓ", "ભાષા બદલો"],
+  "kn-IN": ["ಹೊಸ ಪಟ್ಟಿ", "ನನ್ನ ಪಟ್ಟಿಗಳು", "ಭಾಷೆ ಬದಲಿಸಿ"],
+  "ml-IN": ["പുതിയ ലിസ്റ്റിംഗ്", "എന്റെ ലിസ്റ്റുകൾ", "ഭാഷ മാറ്റുക"],
+  "pa-IN": ["ਨਵੀਂ ਸੂਚੀ", "ਮੇਰੀਆਂ ਸੂਚੀਆਂ", "ਭਾਸ਼ਾ ਬਦਲੋ"],
+  "or-IN": ["ନୂଆ ତାଲିକା", "ମୋ ତାଲିକା", "ଭାଷା ବଦଳାନ୍ତୁ"],
+};
+
+const SELLER_MANAGEMENT_COPY: Record<LanguageCode, SellerManagementCopy> = {
+  "en-IN": {
+    sellerMenuPrompt: "What would you like to do?",
+    managePrompt: "Manage your product listings here.",
+    noListings: "You do not have any listings yet. Tap New listing to add one.",
+    chooseListing: "Choose a listing to manage.",
+    chooseAction: "What would you like to change?",
+    editPricePrompt: "Send the new price in rupees.",
+    editQuantityPrompt: "Send the new quantity.",
+    editDetailsPrompt: "Send the updated product details.",
+    replacePhotoPrompt: "Send a new product photo.",
+    saveChangesPrompt: "Review the changes and tap Save.",
+    changesSaved: "Your changes have been saved.",
+    listingStatusUpdated: "Your listing status has been updated.",
+  },
+  "hi-IN": {
+    sellerMenuPrompt: "आप क्या करना चाहते हैं?",
+    managePrompt: "यहाँ अपनी उत्पाद सूचियाँ प्रबंधित करें।",
+    noListings: "अभी आपकी कोई सूची नहीं है। नई सूची जोड़ने के लिए नई सूची दबाएँ।",
+    chooseListing: "प्रबंधित करने के लिए एक सूची चुनें।",
+    chooseAction: "आप क्या बदलना चाहते हैं?",
+    editPricePrompt: "रुपयों में नई कीमत भेजें।",
+    editQuantityPrompt: "नई मात्रा भेजें।",
+    editDetailsPrompt: "उत्पाद का नया विवरण भेजें।",
+    replacePhotoPrompt: "उत्पाद की नई फोटो भेजें।",
+    saveChangesPrompt: "बदलाव देखें और सहेजें दबाएँ।",
+    changesSaved: "आपके बदलाव सहेज दिए गए हैं।",
+    listingStatusUpdated: "आपकी सूची की स्थिति अपडेट कर दी गई है।",
+  },
+  "bn-IN": {
+    sellerMenuPrompt: "আপনি কী করতে চান?",
+    managePrompt: "এখানে আপনার পণ্যের তালিকা পরিচালনা করুন।",
+    noListings: "আপনার এখনও কোনো তালিকা নেই। একটি যোগ করতে নতুন তালিকা চাপুন।",
+    chooseListing: "পরিচালনার জন্য একটি তালিকা বেছে নিন।",
+    chooseAction: "আপনি কী বদলাতে চান?",
+    editPricePrompt: "রুপিতে নতুন দাম পাঠান।",
+    editQuantityPrompt: "নতুন পরিমাণ পাঠান।",
+    editDetailsPrompt: "পণ্যের নতুন বিবরণ পাঠান।",
+    replacePhotoPrompt: "পণ্যের নতুন ছবি পাঠান।",
+    saveChangesPrompt: "বদলগুলি দেখে সংরক্ষণ চাপুন।",
+    changesSaved: "আপনার বদলগুলি সংরক্ষণ করা হয়েছে।",
+    listingStatusUpdated: "আপনার তালিকার অবস্থা আপডেট করা হয়েছে।",
+  },
+  "te-IN": {
+    sellerMenuPrompt: "మీరు ఏమి చేయాలనుకుంటున్నారు?",
+    managePrompt: "ఇక్కడ మీ ఉత్పత్తి జాబితాలను నిర్వహించండి.",
+    noListings: "మీకు ఇంకా జాబితాలు లేవు. ఒకటి జోడించడానికి కొత్త జాబితాను నొక్కండి.",
+    chooseListing: "నిర్వహించడానికి ఒక జాబితాను ఎంచుకోండి.",
+    chooseAction: "మీరు ఏమి మార్చాలనుకుంటున్నారు?",
+    editPricePrompt: "రూపాయల్లో కొత్త ధరను పంపండి.",
+    editQuantityPrompt: "కొత్త పరిమాణాన్ని పంపండి.",
+    editDetailsPrompt: "ఉత్పత్తి కొత్త వివరాలను పంపండి.",
+    replacePhotoPrompt: "ఉత్పత్తి కొత్త ఫోటోను పంపండి.",
+    saveChangesPrompt: "మార్పులను చూసి సేవ్ నొక్కండి.",
+    changesSaved: "మీ మార్పులు సేవ్ అయ్యాయి.",
+    listingStatusUpdated: "మీ జాబితా స్థితి నవీకరించబడింది.",
+  },
+  "mr-IN": {
+    sellerMenuPrompt: "तुम्हाला काय करायचे आहे?",
+    managePrompt: "येथे तुमच्या उत्पादन सूची व्यवस्थापित करा।",
+    noListings: "तुमच्याकडे अजून कोणतीही सूची नाही। एक जोडण्यासाठी नवीन सूची दाबा।",
+    chooseListing: "व्यवस्थापित करण्यासाठी एक सूची निवडा।",
+    chooseAction: "तुम्हाला काय बदलायचे आहे?",
+    editPricePrompt: "रुपयांत नवीन किंमत पाठवा।",
+    editQuantityPrompt: "नवीन प्रमाण पाठवा।",
+    editDetailsPrompt: "उत्पादनाचे नवीन तपशील पाठवा।",
+    replacePhotoPrompt: "उत्पादनाचा नवीन फोटो पाठवा।",
+    saveChangesPrompt: "बदल पाहा आणि जतन करा दाबा।",
+    changesSaved: "तुमचे बदल जतन झाले आहेत।",
+    listingStatusUpdated: "तुमच्या सूचीची स्थिती अद्ययावत झाली आहे।",
+  },
+  "ta-IN": {
+    sellerMenuPrompt: "நீங்கள் என்ன செய்ய விரும்புகிறீர்கள்?",
+    managePrompt: "உங்கள் பொருள் பட்டியல்களை இங்கே நிர்வகிக்கலாம்.",
+    noListings: "உங்களிடம் இன்னும் பட்டியல் இல்லை. ஒன்றைச் சேர்க்க புதிய பட்டியலை அழுத்துங்கள்.",
+    chooseListing: "நிர்வகிக்க ஒரு பட்டியலைத் தேர்ந்தெடுக்கவும்.",
+    chooseAction: "நீங்கள் எதை மாற்ற விரும்புகிறீர்கள்?",
+    editPricePrompt: "ரூபாயில் புதிய விலையை அனுப்புங்கள்.",
+    editQuantityPrompt: "புதிய அளவை அனுப்புங்கள்.",
+    editDetailsPrompt: "பொருளின் புதிய விவரங்களை அனுப்புங்கள்.",
+    replacePhotoPrompt: "பொருளின் புதிய புகைப்படத்தை அனுப்புங்கள்.",
+    saveChangesPrompt: "மாற்றங்களைப் பார்த்து சேமி அழுத்துங்கள்.",
+    changesSaved: "உங்கள் மாற்றங்கள் சேமிக்கப்பட்டன.",
+    listingStatusUpdated: "உங்கள் பட்டியல் நிலை புதுப்பிக்கப்பட்டது.",
+  },
+  "gu-IN": {
+    sellerMenuPrompt: "તમે શું કરવા માંગો છો?",
+    managePrompt: "અહીં તમારી ઉત્પાદન સૂચિઓ સંભાળો.",
+    noListings: "તમારી પાસે હજી કોઈ સૂચિ નથી. એક ઉમેરવા નવી સૂચિ દબાવો.",
+    chooseListing: "સંભાળવા માટે એક સૂચિ પસંદ કરો.",
+    chooseAction: "તમે શું બદલવા માંગો છો?",
+    editPricePrompt: "રૂપિયામાં નવી કિંમત મોકલો.",
+    editQuantityPrompt: "નવી સંખ્યા મોકલો.",
+    editDetailsPrompt: "ઉત્પાદનની નવી વિગતો મોકલો.",
+    replacePhotoPrompt: "ઉત્પાદનનો નવો ફોટો મોકલો.",
+    saveChangesPrompt: "ફેરફારો જોઈને સેવ દબાવો.",
+    changesSaved: "તમારા ફેરફારો સેવ થયા છે.",
+    listingStatusUpdated: "તમારી સૂચિની સ્થિતિ અપડેટ થઈ છે.",
+  },
+  "kn-IN": {
+    sellerMenuPrompt: "ನೀವು ಏನು ಮಾಡಲು ಬಯಸುತ್ತೀರಿ?",
+    managePrompt: "ನಿಮ್ಮ ಉತ್ಪನ್ನ ಪಟ್ಟಿಗಳನ್ನು ಇಲ್ಲಿ ನಿರ್ವಹಿಸಿ.",
+    noListings: "ನಿಮ್ಮ ಬಳಿ ಇನ್ನೂ ಯಾವುದೇ ಪಟ್ಟಿ ಇಲ್ಲ. ಒಂದನ್ನು ಸೇರಿಸಲು ಹೊಸ ಪಟ್ಟಿ ಒತ್ತಿ.",
+    chooseListing: "ನಿರ್ವಹಿಸಲು ಒಂದು ಪಟ್ಟಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    chooseAction: "ನೀವು ಏನು ಬದಲಾಯಿಸಲು ಬಯಸುತ್ತೀರಿ?",
+    editPricePrompt: "ರೂಪಾಯಿಗಳಲ್ಲಿ ಹೊಸ ಬೆಲೆಯನ್ನು ಕಳುಹಿಸಿ.",
+    editQuantityPrompt: "ಹೊಸ ಪ್ರಮಾಣವನ್ನು ಕಳುಹಿಸಿ.",
+    editDetailsPrompt: "ಉತ್ಪನ್ನದ ಹೊಸ ವಿವರಗಳನ್ನು ಕಳುಹಿಸಿ.",
+    replacePhotoPrompt: "ಉತ್ಪನ್ನದ ಹೊಸ ಫೋಟೋ ಕಳುಹಿಸಿ.",
+    saveChangesPrompt: "ಬದಲಾವಣೆಗಳನ್ನು ನೋಡಿ ಸೇವ್ ಒತ್ತಿ.",
+    changesSaved: "ನಿಮ್ಮ ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಲಾಗಿದೆ.",
+    listingStatusUpdated: "ನಿಮ್ಮ ಪಟ್ಟಿಯ ಸ್ಥಿತಿಯನ್ನು ನವೀಕರಿಸಲಾಗಿದೆ.",
+  },
+  "ml-IN": {
+    sellerMenuPrompt: "നിങ്ങൾ എന്ത് ചെയ്യാൻ ആഗ്രഹിക്കുന്നു?",
+    managePrompt: "നിങ്ങളുടെ ഉൽപ്പന്ന ലിസ്റ്റിംഗുകൾ ഇവിടെ നിയന്ത്രിക്കുക.",
+    noListings: "നിങ്ങൾക്ക് ഇതുവരെ ലിസ്റ്റിംഗുകളൊന്നുമില്ല. ഒന്ന് ചേർക്കാൻ പുതിയ ലിസ്റ്റിംഗ് അമർത്തുക.",
+    chooseListing: "നിയന്ത്രിക്കാൻ ഒരു ലിസ്റ്റിംഗ് തിരഞ്ഞെടുക്കുക.",
+    chooseAction: "നിങ്ങൾ എന്താണ് മാറ്റാൻ ആഗ്രഹിക്കുന്നത്?",
+    editPricePrompt: "രൂപയിൽ പുതിയ വില അയയ്ക്കുക.",
+    editQuantityPrompt: "പുതിയ അളവ് അയയ്ക്കുക.",
+    editDetailsPrompt: "ഉൽപ്പന്നത്തിന്റെ പുതിയ വിവരങ്ങൾ അയയ്ക്കുക.",
+    replacePhotoPrompt: "ഉൽപ്പന്നത്തിന്റെ പുതിയ ഫോട്ടോ അയയ്ക്കുക.",
+    saveChangesPrompt: "മാറ്റങ്ങൾ നോക്കി സേവ് അമർത്തുക.",
+    changesSaved: "നിങ്ങളുടെ മാറ്റങ്ങൾ സംരക്ഷിച്ചു.",
+    listingStatusUpdated: "നിങ്ങളുടെ ലിസ്റ്റിംഗ് നില പുതുക്കി.",
+  },
+  "pa-IN": {
+    sellerMenuPrompt: "ਤੁਸੀਂ ਕੀ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?",
+    managePrompt: "ਆਪਣੀਆਂ ਉਤਪਾਦ ਸੂਚੀਆਂ ਇੱਥੇ ਸੰਭਾਲੋ।",
+    noListings: "ਤੁਹਾਡੀ ਹਾਲੇ ਕੋਈ ਸੂਚੀ ਨਹੀਂ ਹੈ। ਇੱਕ ਜੋੜਨ ਲਈ ਨਵੀਂ ਸੂਚੀ ਦਬਾਓ।",
+    chooseListing: "ਸੰਭਾਲਣ ਲਈ ਇੱਕ ਸੂਚੀ ਚੁਣੋ।",
+    chooseAction: "ਤੁਸੀਂ ਕੀ ਬਦਲਣਾ ਚਾਹੁੰਦੇ ਹੋ?",
+    editPricePrompt: "ਰੁਪਏ ਵਿੱਚ ਨਵੀਂ ਕੀਮਤ ਭੇਜੋ।",
+    editQuantityPrompt: "ਨਵੀਂ ਮਾਤਰਾ ਭੇਜੋ।",
+    editDetailsPrompt: "ਉਤਪਾਦ ਦੇ ਨਵੇਂ ਵੇਰਵੇ ਭੇਜੋ।",
+    replacePhotoPrompt: "ਉਤਪਾਦ ਦੀ ਨਵੀਂ ਫੋਟੋ ਭੇਜੋ।",
+    saveChangesPrompt: "ਬਦਲਾਅ ਵੇਖੋ ਅਤੇ ਸੇਵ ਦਬਾਓ।",
+    changesSaved: "ਤੁਹਾਡੇ ਬਦਲਾਅ ਸੇਵ ਹੋ ਗਏ ਹਨ।",
+    listingStatusUpdated: "ਤੁਹਾਡੀ ਸੂਚੀ ਦੀ ਸਥਿਤੀ ਅੱਪਡੇਟ ਹੋ ਗਈ ਹੈ।",
+  },
+  "or-IN": {
+    sellerMenuPrompt: "ଆପଣ କ'ଣ କରିବାକୁ ଚାହୁଁଛନ୍ତି?",
+    managePrompt: "ଏଠାରେ ଆପଣଙ୍କ ଉତ୍ପାଦ ତାଲିକା ପରିଚାଳନା କରନ୍ତୁ।",
+    noListings: "ଆପଣଙ୍କର ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ତାଲିକା ନାହିଁ। ଗୋଟିଏ ଯୋଡ଼ିବାକୁ ନୂଆ ତାଲିକା ଦବାନ୍ତୁ।",
+    chooseListing: "ପରିଚାଳନା ପାଇଁ ଗୋଟିଏ ତାଲିକା ବାଛନ୍ତୁ।",
+    chooseAction: "ଆପଣ କ'ଣ ବଦଳାଇବାକୁ ଚାହୁଁଛନ୍ତି?",
+    editPricePrompt: "ଟଙ୍କାରେ ନୂଆ ଦାମ ପଠାନ୍ତୁ।",
+    editQuantityPrompt: "ନୂଆ ପରିମାଣ ପଠାନ୍ତୁ।",
+    editDetailsPrompt: "ଉତ୍ପାଦର ନୂଆ ବିବରଣୀ ପଠାନ୍ତୁ।",
+    replacePhotoPrompt: "ଉତ୍ପାଦର ନୂଆ ଫଟୋ ପଠାନ୍ତୁ।",
+    saveChangesPrompt: "ବଦଳଗୁଡ଼ିକ ଦେଖି ସେଭ୍ ଦବାନ୍ତୁ।",
+    changesSaved: "ଆପଣଙ୍କ ବଦଳଗୁଡ଼ିକ ସଞ୍ଚୟ ହୋଇଛି।",
+    listingStatusUpdated: "ଆପଣଙ୍କ ତାଲିକାର ସ୍ଥିତି ଅପଡେଟ୍ ହୋଇଛି।",
+  },
+};
+
+function sellerManagementText(language: LanguageCode, key: SellerManagementCopyKey): string {
+  return SELLER_MANAGEMENT_COPY[language][key];
+}
+
+/** Three high-frequency seller actions kept as native WhatsApp reply buttons. */
+export function sellerMenuButtons(language: LanguageCode): ReplyButton[] {
+  const [newListing, manageListings, changeLanguage] = SELLER_MENU_TITLES[language];
+  return [
+    { id: "seller_new_listing", title: newListing },
+    { id: "seller_manage_listings", title: manageListings },
+    { id: "seller_change_language", title: changeLanguage },
+  ];
+}
+
+export function sellerMenuPrompt(language: LanguageCode): string {
+  return sellerManagementText(language, "sellerMenuPrompt");
+}
+
+export function managePrompt(language: LanguageCode): string {
+  return sellerManagementText(language, "managePrompt");
+}
+
+export function noListings(language: LanguageCode): string {
+  return sellerManagementText(language, "noListings");
+}
+
+export function chooseListing(language: LanguageCode): string {
+  return sellerManagementText(language, "chooseListing");
+}
+
+export function chooseAction(language: LanguageCode): string {
+  return sellerManagementText(language, "chooseAction");
+}
+
+export function editPricePrompt(language: LanguageCode): string {
+  return sellerManagementText(language, "editPricePrompt");
+}
+
+export function editQuantityPrompt(language: LanguageCode): string {
+  return sellerManagementText(language, "editQuantityPrompt");
+}
+
+export function editDetailsPrompt(language: LanguageCode): string {
+  return sellerManagementText(language, "editDetailsPrompt");
+}
+
+export function replacePhotoPrompt(language: LanguageCode): string {
+  return sellerManagementText(language, "replacePhotoPrompt");
+}
+
+export function saveChangesPrompt(language: LanguageCode): string {
+  return sellerManagementText(language, "saveChangesPrompt");
+}
+
+export function changesSaved(language: LanguageCode): string {
+  return sellerManagementText(language, "changesSaved");
+}
+
+export function listingStatusUpdated(language: LanguageCode): string {
+  return sellerManagementText(language, "listingStatusUpdated");
 }
 
 export function confirmationButtons(language: LanguageCode): ReplyButton[] {
