@@ -61,7 +61,7 @@ function parseProduct(value: unknown, context: string): Product {
     typeof createdAt === "string" && !Number.isNaN(Date.parse(createdAt));
   const validNumbers =
     typeof price === "number" && Number.isInteger(price) && price >= 0 &&
-    typeof quantity === "number" && Number.isInteger(quantity) && quantity >= 0;
+    typeof quantity === "number" && Number.isInteger(quantity) && quantity >= 1;
   const validImage =
     imageUrl === null ||
     (typeof imageUrl === "string" && /^\/media\/[^/]+$/.test(imageUrl));
