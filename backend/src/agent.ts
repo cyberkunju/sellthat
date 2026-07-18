@@ -371,7 +371,7 @@ function explicitLanguageFromText(content: string): LanguageCode | null {
 }
 
 function isReset(content: string): boolean {
-  return /^(?:reset|start over|restart|फिर से शुरू|रीसेट)$/iu.test(content.trim());
+  return /^(?:reset|start over|restart|फिर से शुरू|रीसेट|আবার শুরু|শুরু থেকে|রিসেট|మళ్లీ ప్రారంభించు|మొదటి నుండి|రీసెట్|पुन्हा सुरू|सुरुवातीपासून|रीसेट|ரீசெட்|மீண்டும் தொடங்கு|முதலில் இருந்து|રીસેટ|ફરી શરૂ|શરૂઆતથી|ಮರುಹೊಂದಿಸಿ|ಮತ್ತೆ ಆರಂಭಿಸಿ|റീസെറ്റ്|വീണ്ടും തുടങ്ങുക|ਰੀਸੈੱਟ|ਦੁਬਾਰਾ ਸ਼ੁਰੂ|ରିସେଟ|ପୁଣି ଆରମ୍ଭ)$/iu.test(content.trim());
 }
 
 const HEARD_LABELS: Record<LanguageCode, string> = {
@@ -755,7 +755,7 @@ function productPatchSummary(language: LanguageCode, patch: SellerProductPatch):
 }
 
 function isManagementRequest(content: string): boolean {
-  return /\b(?:manage|my\s+(?:listing|listings|product|products)|edit\s+(?:my\s+)?(?:listing|product)|change\s+(?:my\s+)?(?:price|quantity|stock)|mark\s+(?:as\s+)?sold|sold\s*out|restock|archive|restore|inventory)\b|मेरी\s*(?:लिस्ट|सूची)|प्रबंध|விற்று|பட்டியல்\s*நிர்வக|তালিকা\s*পরিচাল|జాబితా\s*నిర్వహ|ಪಟ್ಟಿ\s*ನಿರ್ವಹ|ലിസ്റ്റിംഗ്\s*നിയന്ത്ര|ਸੂਚੀ\s*ਸੰਭਾਲ|ତାଲିକା\s*ପରିଚାଳ/iu.test(content);
+  return /\b(?:manage|my\s+(?:listing|listings|product|products)|edit\s+(?:my\s+)?(?:listing|product)|change\s+(?:my\s+)?(?:price|quantity|stock)|mark\s+(?:as\s+)?sold|sold\s*out|restock|archive|restore|inventory)\b|मेरी\s*(?:लिस्ट|सूची)|प्रबंध|माझ(?:ी|्या)\s*(?:लिस्ट|सूची)|यादी\s*व्यवस्थाप|किंमत\s*बदला|साठा|விற்று|பட்டியல்\s*நிர்வக|তালিকা\s*পরিচাল|జాబితా\s*నిర్వహ|મારી\s*સૂચિ|સૂચિ\s*સંચાલ|કિંમત\s*બદલો|સ્ટોક|ಪಟ್ಟಿ\s*ನಿರ್ವಹ|ലിസ്റ്റിംഗ്\s*നിയന്ത്ര|ਸੂਚੀ\s*ਸੰਭਾਲ|ତାଲିକା\s*ପରିଚାଳ/iu.test(content);
 }
 
 function textWasExplicitlyProvided(source: string, candidate: string): boolean {
