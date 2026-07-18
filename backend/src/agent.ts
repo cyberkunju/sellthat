@@ -802,6 +802,23 @@ function hasConfiguredCommunityLink(): boolean {
   }
 }
 
+function communityUnavailableReply(language: LanguageCode): string {
+  const replies: Record<LanguageCode, string> = {
+    "en-IN": "Seller verification is temporarily unavailable because the community invite has not been configured yet. Please try again shortly.",
+    "hi-IN": "समुदाय आमंत्रण अभी सेट नहीं है, इसलिए विक्रेता सत्यापन अस्थायी रूप से उपलब्ध नहीं है। कृपया थोड़ी देर बाद कोशिश करें।",
+    "bn-IN": "কমিউনিটি আমন্ত্রণ এখনও সেট করা হয়নি, তাই বিক্রেতা যাচাই সাময়িকভাবে পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।",
+    "te-IN": "కమ్యూనిటీ ఆహ్వానం ఇంకా సెట్ కాలేదు, కాబట్టి విక్రేత ధృవీకరణ తాత్కాలికంగా అందుబాటులో లేదు. కొద్దిసేపటి తర్వాత ప్రయత్నించండి.",
+    "mr-IN": "समुदायाचे आमंत्रण अजून सेट केलेले नाही, त्यामुळे विक्रेता पडताळणी तात्पुरती उपलब्ध नाही. कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.",
+    "ta-IN": "சமூக அழைப்பு இன்னும் அமைக்கப்படவில்லை. அதனால் விற்பனையாளர் சரிபார்ப்பு தற்காலிகமாக கிடைக்கவில்லை. சிறிது நேரம் கழித்து முயற்சிக்கவும்.",
+    "gu-IN": "સમુદાયનું આમંત્રણ હજી સેટ થયું નથી, તેથી વેચનાર ચકાસણી હમણાં ઉપલબ્ધ નથી. કૃપા કરીને થોડા સમય પછી ફરી પ્રયાસ કરો.",
+    "kn-IN": "ಸಮುದಾಯ ಆಹ್ವಾನ ಇನ್ನೂ ಹೊಂದಿಸಲಾಗಿಲ್ಲ, ಆದ್ದರಿಂದ ಮಾರಾಟಗಾರರ ಪರಿಶೀಲನೆ ತಾತ್ಕಾಲಿಕವಾಗಿ ಲಭ್ಯವಿಲ್ಲ. ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಪ್ರಯತ್ನಿಸಿ.",
+    "ml-IN": "കമ്മ്യൂണിറ്റി ക്ഷണം ഇതുവരെ സജ്ജമാക്കിയിട്ടില്ല, അതിനാൽ വിൽപ്പനക്കാരന്റെ പരിശോധന താൽക്കാലികമായി ലഭ്യമല്ല. കുറച്ച് കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കുക.",
+    "pa-IN": "ਕਮਿਊਨਿਟੀ ਸੱਦਾ ਅਜੇ ਸੈੱਟ ਨਹੀਂ ਹੈ, ਇਸ ਲਈ ਵਿਕਰੇਤਾ ਤਸਦੀਕ ਅਸਥਾਈ ਤੌਰ ਤੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਕੁਝ ਸਮੇਂ ਬਾਅਦ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "or-IN": "କମ୍ୟୁନିଟି ନିମନ୍ତ୍ରଣ ଏପର୍ଯ୍ୟନ୍ତ ସେଟ୍ ହୋଇନାହିଁ, ତେଣୁ ବିକ୍ରେତା ଯାଞ୍ଚ ସାମୟିକ ଭାବେ ଉପଲବ୍ଧ ନୁହେଁ। କିଛି ସମୟ ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+  };
+  return replies[language];
+}
+
 async function safeConfirmationReply(
   candidate: string | undefined,
   draft: DraftListing,
@@ -1707,15 +1724,19 @@ async function beginSellerFlow(
     return;
   }
 
+  const verificationSession = await saveSession(session.phone, {
+    stage: "verify_gate",
+    role: "seller",
+    language,
+  });
   if (!hasConfiguredCommunityLink()) {
     console.warn("[agent] seller verification is blocked until COMMUNITY_LINK is configured");
-    await replyAndRemember(session, to, localizedText(language, "tryAgain"), language);
+    await replyAndRemember(verificationSession, to, communityUnavailableReply(language), language);
     return;
   }
 
-  const updated = await saveSession(session.phone, { stage: "verify_gate", role: "seller", language });
   await sendVerificationAndRemember(
-    updated,
+    verificationSession,
     to,
     language,
     localizedText(language, "verifyPrompt", { communityLink: config.communityLink }),
@@ -1760,12 +1781,16 @@ async function processInboundMessage(message: InboundMessage): Promise<void> {
       if (session.stage === "done" && session.role === "buyer") {
         await replyAndRemember(session, message.from, localizedText(language, "buyerSoon"), language);
       } else if (session.stage === "verify_gate") {
-        await sendVerificationAndRemember(
-          session,
-          message.from,
-          language,
-          localizedText(language, "verifyAgain"),
-        );
+        if (!hasConfiguredCommunityLink()) {
+          await replyAndRemember(session, message.from, communityUnavailableReply(language), language);
+        } else {
+          await sendVerificationAndRemember(
+            session,
+            message.from,
+            language,
+            localizedText(language, "verifyAgain"),
+          );
+        }
       } else if (session.stage === "role") {
         await replyAndRemember(session, message.from, localizedText(language, "chooseRole"), language, roleButtons(language));
       } else if (session.stage === "selling") {
@@ -1845,6 +1870,10 @@ async function processInboundMessage(message: InboundMessage): Promise<void> {
     }
 
     if (session.stage === "verify_gate") {
+      if (!hasConfiguredCommunityLink()) {
+        await replyAndRemember(session, message.from, communityUnavailableReply(language), language);
+        return;
+      }
       const draft = currentDraft(session);
       const validVerificationTap =
         message.buttonId === "verify_yes" &&
