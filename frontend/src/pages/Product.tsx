@@ -51,14 +51,14 @@ export function Product({ id }: ProductProps): JSX.Element {
     return (
       <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8" role="status">
         <span className="sr-only">Loading product…</span>
-        <div className="h-5 w-32 rounded bg-stone-200 motion-safe:animate-pulse" aria-hidden="true" />
+        <div className="h-5 w-32 rounded bg-surface-200 motion-safe:animate-pulse" aria-hidden="true" />
         <div className="mt-8 grid gap-10 lg:grid-cols-2" aria-hidden="true">
-          <div className="aspect-square rounded-3xl bg-stone-200 motion-safe:animate-pulse" />
+          <div className="aspect-square rounded-3xl bg-surface-200 motion-safe:animate-pulse" />
           <div className="space-y-5 py-4">
-            <div className="h-4 w-24 rounded bg-stone-200 motion-safe:animate-pulse" />
-            <div className="h-10 w-4/5 rounded bg-stone-200 motion-safe:animate-pulse" />
-            <div className="h-8 w-32 rounded bg-stone-200 motion-safe:animate-pulse" />
-            <div className="h-24 rounded-2xl bg-stone-100 motion-safe:animate-pulse" />
+            <div className="h-4 w-24 rounded bg-surface-200 motion-safe:animate-pulse" />
+            <div className="h-10 w-4/5 rounded bg-surface-200 motion-safe:animate-pulse" />
+            <div className="h-8 w-32 rounded bg-surface-200 motion-safe:animate-pulse" />
+            <div className="h-24 rounded-2xl bg-surface-100 motion-safe:animate-pulse" />
           </div>
         </div>
       </div>
@@ -69,12 +69,12 @@ export function Product({ id }: ProductProps): JSX.Element {
     return (
       <div className="mx-auto flex min-h-[58vh] w-full max-w-2xl items-center px-4 py-16 text-center sm:px-6">
         <section className="w-full rounded-3xl border border-amber-200 bg-amber-50 px-6 py-12" role="alert">
-          <h1 className="text-2xl font-bold text-stone-950">We couldn’t load this product</h1>
-          <p className="mt-3 leading-7 text-stone-600">Please try again in a moment.</p>
+          <h1 className="text-2xl font-bold text-surface-900">We couldn’t load this product</h1>
+          <p className="mt-3 leading-7 text-surface-500">Please try again in a moment.</p>
           <button
             type="button"
             onClick={() => setAttempt((value) => value + 1)}
-            className="mt-6 min-h-11 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-stone-300"
+            className="mt-6 min-h-11 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-white hover:bg-surface-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-100"
           >
             Try again
           </button>
@@ -91,13 +91,13 @@ export function Product({ id }: ProductProps): JSX.Element {
       <Link
         href="/"
         replace
-        className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-semibold text-stone-600 hover:text-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-100"
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-semibold text-surface-500 hover:text-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-100"
       >
         <span aria-hidden="true">←</span> Back to marketplace
       </Link>
 
       <article className="mt-6 grid min-w-0 items-start gap-9 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] lg:gap-14">
-        <div className="aspect-square min-w-0 overflow-hidden rounded-3xl border border-stone-200 bg-stone-100 shadow-card">
+        <div className="aspect-square min-w-0 overflow-hidden rounded-3xl border border-surface-200 bg-surface-100 shadow-card">
           <ProductImage
             src={product.imageUrl}
             alt={`${product.title} product photo`}
@@ -110,43 +110,43 @@ export function Product({ id }: ProductProps): JSX.Element {
           <p className="[overflow-wrap:anywhere] text-sm font-semibold uppercase tracking-[0.16em] text-brand-700">
             {product.category}
           </p>
-          <h1 className="mt-3 [overflow-wrap:anywhere] text-3xl font-bold tracking-tight text-stone-950 sm:text-4xl lg:text-5xl">
+          <h1 className="mt-3 [overflow-wrap:anywhere] text-3xl font-bold tracking-tight text-surface-900 sm:text-4xl lg:text-5xl">
             {product.title}
           </h1>
-          <p className="mt-5 text-3xl font-bold text-stone-950">{formatRupees(product.price)}</p>
+          <p className="mt-5 text-3xl font-bold text-surface-900">{formatRupees(product.price)}</p>
 
           <dl className="mt-6 flex min-w-0 flex-wrap gap-3 text-sm">
             <div className="max-w-full rounded-full bg-brand-50 px-4 py-2 text-brand-800">
               <dt className="sr-only">Quantity</dt>
               <dd className="font-semibold">{formatQuantity(product.quantity)} available</dd>
             </div>
-            <div className="max-w-full rounded-full bg-stone-100 px-4 py-2 text-stone-700">
+            <div className="max-w-full rounded-full bg-surface-100 px-4 py-2 text-surface-700">
               <dt className="sr-only">Category</dt>
               <dd className="[overflow-wrap:anywhere] font-medium">{product.category}</dd>
             </div>
           </dl>
 
-          <section className="mt-8 border-t border-stone-200 pt-7" aria-labelledby="description-heading">
-            <h2 id="description-heading" className="text-lg font-semibold text-stone-900">About this product</h2>
-            <p className="mt-3 whitespace-pre-line [overflow-wrap:anywhere] leading-7 text-stone-600">
+          <section className="mt-8 border-t border-surface-200 pt-7" aria-labelledby="description-heading">
+            <h2 id="description-heading" className="text-lg font-semibold text-surface-900">About this product</h2>
+            <p className="mt-3 whitespace-pre-line [overflow-wrap:anywhere] leading-7 text-surface-500">
               {product.description.trim() || "No description provided."}
             </p>
           </section>
 
-          <section className="mt-8 min-w-0 rounded-2xl border border-stone-200 bg-white p-5" aria-labelledby="seller-heading">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Sold by</p>
-            <h2 id="seller-heading" className="mt-1 [overflow-wrap:anywhere] text-lg font-semibold text-stone-900">{sellerName}</h2>
-            {product.sellerLocation && <p className="mt-1 [overflow-wrap:anywhere] text-sm text-stone-600">{product.sellerLocation}</p>}
+          <section className="mt-8 min-w-0 rounded-2xl border border-surface-200 bg-white p-5" aria-labelledby="seller-heading">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-surface-400">Sold by</p>
+            <h2 id="seller-heading" className="mt-1 [overflow-wrap:anywhere] text-lg font-semibold text-surface-900">{sellerName}</h2>
+            {product.sellerLocation && <p className="mt-1 [overflow-wrap:anywhere] text-sm text-surface-500">{product.sellerLocation}</p>}
           </section>
 
           <button
             type="button"
             disabled
-            className="mt-6 min-h-12 w-full cursor-not-allowed rounded-xl bg-stone-200 px-6 py-3 font-semibold text-stone-500"
+            className="mt-6 min-h-12 w-full cursor-not-allowed rounded-xl bg-surface-200 px-6 py-3 font-semibold text-surface-500"
           >
             Buy — coming soon
           </button>
-          <p className="mt-2 text-center text-xs leading-5 text-stone-500">
+          <p className="mt-2 text-center text-xs leading-5 text-surface-400">
             Buying on SellThat is not available yet.
           </p>
         </div>

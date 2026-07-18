@@ -21,7 +21,7 @@ export function ProductImage({
   if (!src || failed) {
     return (
       <div
-        className={`flex items-center justify-center bg-gradient-to-br from-stone-100 to-stone-200 text-stone-400 ${className}`}
+        className={`flex items-center justify-center bg-gradient-to-br from-brand-50 to-surface-200 text-surface-400 ${className}`}
         role="img"
         aria-label="Product image unavailable"
       >
@@ -37,7 +37,7 @@ export function ProductImage({
     <img
       src={toAssetUrl(src)}
       alt={alt}
-      className={`bg-stone-100 object-cover ${className}`}
+      className={`bg-surface-100 object-cover ${className}`}
       loading={eager ? "eager" : "lazy"}
       decoding="async"
       onError={() => setFailed(true)}

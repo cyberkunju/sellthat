@@ -16,12 +16,12 @@ export function NotFound({
 
   return (
     <div className="mx-auto flex min-h-[58vh] w-full max-w-2xl items-center px-4 py-16 text-center sm:px-6">
-      <section className="w-full rounded-3xl border border-stone-200 bg-white px-6 py-14 shadow-card" aria-labelledby="not-found-heading">
+      <section className="w-full rounded-3xl border border-surface-200 bg-white px-6 py-14 shadow-card" aria-labelledby="not-found-heading">
         <p className="text-sm font-bold uppercase tracking-[0.18em] text-brand-700">404</p>
-        <h1 id="not-found-heading" className="mt-3 text-3xl font-bold tracking-tight text-stone-950">
+        <h1 id="not-found-heading" className="mt-3 text-3xl font-bold tracking-tight text-surface-900">
           {title}
         </h1>
-        <p className="mx-auto mt-3 max-w-md break-words leading-7 text-stone-600">{message}</p>
+        <p className="mx-auto mt-3 max-w-md break-words leading-7 text-surface-500">{message}</p>
         <Link
           href="/"
           replace
