@@ -96,7 +96,7 @@ function validList(): ReplyList {
 }
 
 describe("WhatsApp interactive sender", () => {
-  it("sends text, one interactive control, then the voice note", async () => {
+  it("sends only the interactive control (no duplicate text) then the voice note", async () => {
     const { calls, sender } = createCapturedSender();
 
     const result = await sender.reply(
@@ -106,24 +106,31 @@ describe("WhatsApp interactive sender", () => {
       [{ id: "role_seller", title: "Seller" }],
     );
 
-    expect(calls.map((call) => call.kind)).toEqual(["text", "button", "media", "audio"]);
+    // The button message already renders its own body text, so there must be
+    // no separate plain-text message duplicating it.
+    expect(calls.map((call) => call.kind)).toEqual(["button", "media", "audio"]);
+    expect(result.interactive).toEqual({ ok: true, messageId: "wamid-1" });
     expect(result.text).toEqual({ ok: true, messageId: "wamid-1" });
-    expect(result.interactive).toEqual({ ok: true, messageId: "wamid-2" });
-    expect(result.voice).toEqual({ ok: true, messageId: "wamid-3" });
+    expect(result.voice).toEqual({ ok: true, messageId: "wamid-2" });
 
     expect(calls[0]?.payload).toMatchObject({
-      type: "text",
-      text: { body: "Choose your role.", preview_url: false },
-    });
-    expect(calls[1]?.payload).toMatchObject({
       type: "interactive",
       interactive: {
         type: "button",
+        body: { text: "Choose your role." },
         action: {
           buttons: [{ type: "reply", reply: { id: "role_seller", title: "Seller" } }],
         },
       },
     });
+  });
+
+  it("sends a single plain text message when there is no interactive control", async () => {
+    const { calls, sender } = createCapturedSender();
+
+    await sender.reply("919876543210", "Welcome to SellThat!", "en-IN");
+
+    expect(calls.map((call) => call.kind)).toEqual(["text", "media", "audio"]);
   });
 
   it("uses a list as the single optional interactive reply", async () => {
@@ -137,8 +144,8 @@ describe("WhatsApp interactive sender", () => {
       validList(),
     );
 
-    expect(calls.map((call) => call.kind)).toEqual(["text", "list", "media", "audio"]);
-    expect(result.interactive).toEqual({ ok: true, messageId: "wamid-2" });
+    expect(calls.map((call) => call.kind)).toEqual(["list", "media", "audio"]);
+    expect(result.interactive).toEqual({ ok: true, messageId: "wamid-1" });
   });
 
   it("emits Meta's list payload and rejects invalid list limits before sending", async () => {

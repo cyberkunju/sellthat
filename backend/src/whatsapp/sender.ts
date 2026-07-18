@@ -320,10 +320,11 @@ export class WhatsAppSender implements WhatsAppSenderClient {
   }
 
   /**
-   * The mandatory outbound path: plain text first, one optional interactive
-   * choice next, then Sarvam's mp3 voice note. The separate text message is
-   * intentional: it remains readable even when an old client cannot render an
-   * interactive control.
+   * The mandatory outbound path: one visible message, then Sarvam's mp3 voice
+   * note. When a reply carries buttons or a list, that interactive message
+   * already renders the body text, so no separate plain-text message is sent
+   * (it would duplicate the words); a plain text is used only when there is no
+   * interactive control, or as a fallback if the interactive send fails.
    */
   public async reply(
     to: string,
@@ -332,16 +333,28 @@ export class WhatsAppSender implements WhatsAppSenderClient {
     buttons?: readonly ReplyButton[],
     list?: ReplyList,
   ): Promise<ReplyResult> {
+    const wantsInteractive =
+      (buttons !== undefined && buttons.length > 0) || list !== undefined;
+
     let textResult: WhatsAppSendResult;
+    let interactive: WhatsAppSendResult | null;
 
-    try {
-      textResult = await this.sendText(to, text);
-    } catch (error: unknown) {
-      this.log(`text reply failed (${failureReason(error)})`);
-      textResult = { ok: false, errorCode: "send_failed" };
+    if (wantsInteractive) {
+      // A button/list message already renders its own body text, so sending a
+      // separate plain-text message would show the same words twice. Send only
+      // the interactive control, and fall back to plain text solely if it fails
+      // so the seller always receives the message body.
+      interactive = await this.sendOptionalInteractive(to, text, buttons, list);
+      textResult = interactive?.ok ? interactive : await this.sendText(to, text);
+    } else {
+      interactive = null;
+      try {
+        textResult = await this.sendText(to, text);
+      } catch (error: unknown) {
+        this.log(`text reply failed (${failureReason(error)})`);
+        textResult = { ok: false, errorCode: "send_failed" };
+      }
     }
-
-    const interactive = await this.sendOptionalInteractive(to, text, buttons, list);
 
     if (this.options.speak === undefined) {
       this.log("voice reply skipped because no speech provider was configured");
