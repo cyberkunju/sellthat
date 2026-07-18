@@ -1374,10 +1374,16 @@ async function executeTool(call: ToolCall, context: ToolContext): Promise<ToolRe
       );
       if (!product) return { message: "Listing is not eligible to publish.", context };
       const productUrl = `${config.publicBaseUrl.replace(/\/+$/u, "")}/p/${product.id}`;
-      // publishSessionDraft has already cleared the draft and set the stage in
-      // its transaction. Avoid a second write that could hide a successful
-      // publication behind an unrelated post-commit failure.
-      return { message: `Published ${productUrl}`, context, productUrl };
+      // publishSessionDraft cleared the draft in its transaction. Reload the
+      // session so the caller (the seller menu) writes from the cleared state
+      // instead of restoring the just-published draft — which would leave a
+      // stale, still-confirmable draft and allow a duplicate publish.
+      const publishedSession = await getSession(context.phone);
+      return {
+        message: `Published ${productUrl}`,
+        context: { ...context, session: publishedSession },
+        productUrl,
+      };
     }
 
     default:
