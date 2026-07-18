@@ -403,7 +403,8 @@ export async function updateSellerProduct(
       and p.id = ${parsedId.data}::uuid
       and (
         not ${hasExpectedUpdatedAt}
-        or p.updated_at = ${expectedUpdatedAtValue}
+        or date_trunc('milliseconds', p.updated_at)
+           = date_trunc('milliseconds', ${expectedUpdatedAtValue}::timestamptz)
       )
       and (
         ${!hasImageId || imageId === null}

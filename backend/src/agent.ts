@@ -2170,6 +2170,19 @@ async function handleManagementTurn(
     return true;
   }
 
+  // A free-text / voice / photo turn (no button tap) while only a picker or an
+  // action list is open is a fresh natural-language intent — not picker
+  // navigation. Clear the transient management state and let normal routing
+  // (new listing, change language, manage a different product, etc.) handle it,
+  // so the seller is never trapped in "Choose a listing to manage".
+  if (!message.buttonId) {
+    await saveSession(session.phone, {
+      draft: { ...currentDraft(session), management: undefined },
+    });
+    return false;
+  }
+
+  // A stale or unrecognized button tap: re-show the most relevant view.
   if (management.selectedProductId) {
     await sendManagementActions(session, to, language);
     return true;
