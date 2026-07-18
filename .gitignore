@@ -1,0 +1,18 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# Local SellThat source-of-truth planning documents: never add to Git history.
+/SELLTHAT-PLAN.md
+/SELLTHAT-RULES.md
+/SELLTHAT-TRACKER.md
+/TRACK-A-BOT-BACKEND.md
+/TRACK-B-WEB-DEPLOY.md
