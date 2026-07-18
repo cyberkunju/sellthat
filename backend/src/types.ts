@@ -55,6 +55,8 @@ export interface DraftListing {
   confirmationMessageId?: string;
   /** Meta id of the exact outbound Verify interactive message. */
   verificationMessageId?: string;
+  /** Meta id of the exact outbound seller-menu interactive message. */
+  sellerMenuMessageId?: string;
   /**
    * Set by deterministic copy after asking for the next missing hard fact.
    * It lets a bare numeric reply be interpreted only in that unambiguous

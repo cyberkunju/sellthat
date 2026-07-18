@@ -106,6 +106,8 @@ const DraftSchema = z.object({
   confirmationMessageId: z.string().trim().min(1).max(256).optional(),
   /** Meta id of the exact outbound Verify button message. */
   verificationMessageId: z.string().trim().min(1).max(256).optional(),
+  /** Meta id of the exact outbound seller-menu button message. */
+  sellerMenuMessageId: z.string().trim().min(1).max(256).optional(),
   expectedHardFact: z.enum(["price", "quantity"]).optional(),
   management: ManagementStateSchema.optional(),
 });
@@ -116,6 +118,7 @@ const DraftUpdateSchema = DraftSchema.omit({
   confirmationReady: true,
   confirmationMessageId: true,
   verificationMessageId: true,
+  sellerMenuMessageId: true,
   expectedHardFact: true,
   management: true,
 }).extend({
@@ -1314,7 +1317,32 @@ async function sendSellerMenu(
   prefix?: string,
 ): Promise<Session> {
   const body = prefix ? `${prefix}\n\n${sellerMenuPrompt(language)}` : sellerMenuPrompt(language);
-  return replyAndRemember(session, to, body, language, sellerMenuButtons(language));
+  const pending = await saveSession(session.phone, {
+    draft: {
+      ...currentDraft(session),
+      sellerMenuMessageId: undefined,
+    },
+  });
+  const delivery = await sender.reply(to, body, language, sellerMenuButtons(language));
+  const sellerMenuMessageId = delivery.interactive?.ok
+    ? delivery.interactive.messageId
+    : undefined;
+  const updated = await saveSession(pending.phone, {
+    draft: {
+      ...currentDraft(pending),
+      sellerMenuMessageId,
+    },
+  });
+  return rememberAssistantReply(updated, body);
+}
+
+function isCurrentSellerMenuTap(session: Session, message: InboundMessage): boolean {
+  const sellerMenuMessageId = currentDraft(session).sellerMenuMessageId;
+  return Boolean(
+    sellerMenuMessageId &&
+      message.contextMessageId &&
+      sellerMenuMessageId === message.contextMessageId,
+  );
 }
 
 async function sendListingPicker(
@@ -1326,7 +1354,11 @@ async function sendListingPicker(
   const products = await listSellerProducts(session.phone);
   if (products.length === 0) {
     const updated = await saveSession(session.phone, {
-      draft: { ...currentDraft(session), management: undefined },
+      draft: {
+        ...currentDraft(session),
+        sellerMenuMessageId: undefined,
+        management: undefined,
+      },
     });
     return replyAndRemember(updated, to, noListings(language), language, sellerMenuButtons(language));
   }
@@ -1338,15 +1370,18 @@ async function sendListingPicker(
     requestedPage ?? current.productListPage ?? 0,
   );
   const pending = await saveSession(session.phone, {
-    draft: draftWithManagement(session, {
-      productListPage: page,
-      productListMessageId: undefined,
-      actionListMessageId: undefined,
-      confirmationMessageId: undefined,
-      selectedProductId: undefined,
-      action: undefined,
-      pendingPatch: undefined,
-    }),
+    draft: {
+      ...draftWithManagement(session, {
+        productListPage: page,
+        productListMessageId: undefined,
+        actionListMessageId: undefined,
+        confirmationMessageId: undefined,
+        selectedProductId: undefined,
+        action: undefined,
+        pendingPatch: undefined,
+      }),
+      sellerMenuMessageId: undefined,
+    },
   });
   const body = list.body;
   const delivery = await sender.reply(to, body, language, undefined, list);
@@ -1961,6 +1996,14 @@ async function processInboundMessage(message: InboundMessage): Promise<void> {
       return;
     }
 
+    const sellerMenuButton = message.buttonId === "seller_new_listing" ||
+      message.buttonId === "seller_change_language" ||
+      message.buttonId === "seller_manage_listings";
+    if (sellerMenuButton && !isCurrentSellerMenuTap(session, message)) {
+      await sendSellerMenu(session, message.from, language);
+      return;
+    }
+
     if (message.buttonId === "seller_new_listing") {
       const updated = await saveSession(message.from, {
         draft: {},
@@ -1981,6 +2024,15 @@ async function processInboundMessage(message: InboundMessage): Promise<void> {
     if (message.buttonId === "seller_manage_listings") {
       await sendListingPicker(session, message.from, language);
       return;
+    }
+
+    if (currentDraft(session).sellerMenuMessageId) {
+      session = await saveSession(message.from, {
+        draft: {
+          ...currentDraft(session),
+          sellerMenuMessageId: undefined,
+        },
+      });
     }
 
     if (await handleManagementTurn(message, session, message.from, language, turn.content)) {
