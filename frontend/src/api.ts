@@ -1,8 +1,11 @@
+export type ProductStatus = "active" | "sold_out";
+
 export interface Product {
   id: string;
   title: string;
   price: number;
   quantity: number;
+  status: ProductStatus;
   category: string;
   description: string;
   imageUrl: string | null;
@@ -45,6 +48,7 @@ function parseProduct(value: unknown, context: string): Product {
     title,
     price,
     quantity,
+    status,
     category,
     description,
     imageUrl,
@@ -62,6 +66,7 @@ function parseProduct(value: unknown, context: string): Product {
   const validNumbers =
     typeof price === "number" && Number.isInteger(price) && price >= 0 &&
     typeof quantity === "number" && Number.isInteger(quantity) && quantity >= 1;
+  const validStatus = status === "active" || status === "sold_out";
   const validImage =
     imageUrl === null ||
     (typeof imageUrl === "string" && /^\/media\/[^/]+$/.test(imageUrl));
@@ -69,7 +74,7 @@ function parseProduct(value: unknown, context: string): Product {
     (sellerName === null || typeof sellerName === "string") &&
     (sellerLocation === null || typeof sellerLocation === "string");
 
-  if (!validRequiredStrings || !validNumbers || !validImage || !validSeller) {
+  if (!validRequiredStrings || !validNumbers || !validStatus || !validImage || !validSeller) {
     throw invalidResponse(context);
   }
 
@@ -78,6 +83,7 @@ function parseProduct(value: unknown, context: string): Product {
     title,
     price,
     quantity,
+    status,
     category,
     description,
     imageUrl,

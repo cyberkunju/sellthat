@@ -85,6 +85,7 @@ export function Product({ id }: ProductProps): JSX.Element {
 
   const { product } = state;
   const sellerName = product.sellerName ?? "Local seller";
+  const isSoldOut = product.status === "sold_out";
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
@@ -115,10 +116,18 @@ export function Product({ id }: ProductProps): JSX.Element {
           </h1>
           <p className="mt-5 text-3xl font-bold text-surface-900">{formatRupees(product.price)}</p>
 
+          {isSoldOut && (
+            <p className="mt-4 inline-flex min-h-10 items-center rounded-full bg-surface-900 px-4 text-sm font-bold text-white">
+              Sold out
+            </p>
+          )}
+
           <dl className="mt-6 flex min-w-0 flex-wrap gap-3 text-sm">
             <div className="max-w-full rounded-full bg-brand-50 px-4 py-2 text-brand-800">
               <dt className="sr-only">Quantity</dt>
-              <dd className="font-semibold">{formatQuantity(product.quantity)} available</dd>
+              <dd className="font-semibold">
+                {isSoldOut ? "Currently unavailable" : `${formatQuantity(product.quantity)} available`}
+              </dd>
             </div>
             <div className="max-w-full rounded-full bg-surface-100 px-4 py-2 text-surface-700">
               <dt className="sr-only">Category</dt>

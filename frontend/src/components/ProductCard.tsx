@@ -9,6 +9,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps): JSX.Element {
   const seller = product.sellerName ?? "Local seller";
+  const isSoldOut = product.status === "sold_out";
   const sellerDetails = product.sellerLocation
     ? `${seller} · ${product.sellerLocation}`
     : seller;
@@ -18,14 +19,19 @@ export function ProductCard({ product }: ProductCardProps): JSX.Element {
       <Link
         href={`/p/${encodeURIComponent(product.id)}`}
         className="block h-full rounded-3xl focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-100"
-        aria-label={`View ${product.title}`}
+        aria-label={`View ${product.title}${isSoldOut ? ", sold out" : ""}`}
       >
-        <div className="aspect-[4/3] overflow-hidden bg-surface-100">
+        <div className="relative aspect-[4/3] overflow-hidden bg-surface-100">
           <ProductImage
             src={product.imageUrl}
             alt={`${product.title} product photo`}
             className="h-full w-full motion-safe:transition motion-safe:duration-300 motion-safe:group-hover:scale-[1.02]"
           />
+          {isSoldOut && (
+            <span className="absolute right-3 top-3 rounded-full bg-surface-900 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.1em] text-white shadow-sm">
+              Sold out
+            </span>
+          )}
         </div>
         <div className="min-w-0 p-5">
           <p className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">
@@ -37,6 +43,7 @@ export function ProductCard({ product }: ProductCardProps): JSX.Element {
           <p className="mt-3 text-xl font-bold text-surface-900">
             {formatRupees(product.price)}
           </p>
+          {isSoldOut && <p className="mt-2 text-sm font-semibold text-surface-500">Currently unavailable</p>}
           <p className="mt-3 truncate text-sm text-surface-500">{sellerDetails}</p>
         </div>
       </Link>
