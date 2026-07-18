@@ -189,11 +189,6 @@ export async function saveSession(
   return toSession(updated);
 }
 
-export async function deleteSession(phone: string): Promise<void> {
-  const normalizedPhone = normalizePhone(phone);
-  await sql`delete from sessions where phone = ${normalizedPhone}`;
-}
-
 export function appendHistory(
   session: Pick<Session, "history">,
   turn: SessionHistoryTurn,
