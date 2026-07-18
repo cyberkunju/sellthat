@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 
 import { hasPromptInjection, hasSelfHarmSignal } from "../src/guard";
 import {
+  detectLanguage,
   detectScriptLanguage,
   normalizeLanguageCode,
   toSarvamLanguageCode,
@@ -75,6 +76,30 @@ describe("detectScriptLanguage", () => {
 
   it("lets a dominant Indian script win over incidental Latin/numerals", () => {
     expect(detectScriptLanguage("iPhone 13 விற்பனைக்கு உள்ளது")).toBe("ta-IN");
+  });
+});
+
+describe("detectLanguage", () => {
+  it("lets text-lid recognize a Romanized language switch over a saved language", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ language_code: "hi-IN" }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    )) as unknown as typeof globalThis.fetch;
+
+    try {
+      await expect(
+        detectLanguage("namaste, mujhe product bechna hai", { sessionLanguage: "ta-IN" }),
+      ).resolves.toBe("hi-IN");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("retains the saved language when offline-only detection is requested", async () => {
+    await expect(
+      detectLanguage("vanakkam", { sessionLanguage: "ta-IN", resolveAmbiguity: false }),
+    ).resolves.toBe("ta-IN");
   });
 });
 

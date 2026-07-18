@@ -198,7 +198,9 @@ export function detectScriptLanguage(text: string): LanguageCode | null {
 
 /**
  * Script-first language detection for the eleven supported languages. Only Latin and Devanagari
- * are sent to Sarvam text-lid, and Latin retains the session language when one already exists.
+ * are sent to Sarvam text-lid. A saved language is a resilient fallback for Romanized turns, not
+ * a lock: text-lid may still recognize an explicit "Tamil", "Bangla", or Romanized language
+ * switch the seller typed.
  */
 export async function detectLanguage(
   text: string,
@@ -208,15 +210,15 @@ export async function detectLanguage(
     const scriptLanguage = detectScriptLanguage(text);
     if (!scriptLanguage) return options.sessionLanguage ?? DEFAULT_LANGUAGE;
 
-    if (scriptLanguage === "en-IN" && options.sessionLanguage) {
+    const resolveAmbiguity = options.resolveAmbiguity ?? true;
+    if (scriptLanguage === "en-IN" && options.sessionLanguage && !resolveAmbiguity) {
       return options.sessionLanguage;
     }
 
-    const resolveAmbiguity = options.resolveAmbiguity ?? true;
     const isAmbiguous = scriptLanguage === "hi-IN" || !hasIndianScript(text);
     if (!resolveAmbiguity || !isAmbiguous) return scriptLanguage;
 
-    return (await identifyLanguage(text)) ?? scriptLanguage;
+    return (await identifyLanguage(text)) ?? options.sessionLanguage ?? scriptLanguage;
   } catch {
     return options.sessionLanguage ?? DEFAULT_LANGUAGE;
   }
