@@ -162,7 +162,10 @@ export class WhatsAppSender implements WhatsAppSenderClient {
       const form = new FormData();
       form.set("messaging_product", "whatsapp");
       form.set("type", mime);
-      form.set("file", new Blob([bytes], { type: mime }), filename);
+      // Copy into a standard ArrayBuffer-backed view for the DOM Blob type
+      // and Bun's multipart encoder.
+      const blobBytes = Uint8Array.from(bytes);
+      form.set("file", new Blob([blobBytes.buffer], { type: mime }), filename);
 
       const response = await this.fetcher(this.mediaEndpoint(), {
         method: "POST",

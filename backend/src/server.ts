@@ -38,7 +38,10 @@ app.get("/media/:id", async (context) => {
     return context.text("Not found", 404);
   }
 
-  return context.body(image.bytes, 200, {
+  // postgres returns an ArrayBufferLike-backed view; copy it into a standard
+  // ArrayBuffer-backed Uint8Array accepted by Hono's strict body overload.
+  const bytes = new Uint8Array(image.bytes);
+  return context.body(bytes, 200, {
     "content-type": image.mime,
     "cache-control": "public, max-age=86400",
     "x-content-type-options": "nosniff",
