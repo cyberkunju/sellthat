@@ -983,6 +983,9 @@ async function executeTool(call: ToolCall, context: ToolContext): Promise<ToolRe
     case "set_role": {
       const parsed = z.object({ role: z.enum(["seller", "buyer"]) }).safeParse(argumentsValue);
       if (!parsed.success) return { message: "Invalid role.", context };
+      if (context.session.stage !== "role") {
+        return { message: "Role can only be chosen during onboarding.", context };
+      }
       const session = await saveSession(context.phone, {
         role: parsed.data.role,
         stage: parsed.data.role === "buyer" ? "done" : context.session.stage,
