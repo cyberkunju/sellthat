@@ -1639,14 +1639,26 @@ async function sendListingPicker(
 ): Promise<Session> {
   const products = await listSellerProducts(session.phone);
   if (products.length === 0) {
-    const updated = await saveSession(session.phone, {
+    // These are seller-menu buttons, so their outbound message id must be
+    // registered as the current seller-menu context. Otherwise tapping
+    // "New listing" (or My listings / Language) here fails the seller-menu tap
+    // guard and merely re-shows the menu instead of acting.
+    const pending = await saveSession(session.phone, {
       draft: {
         ...currentDraft(session),
         sellerMenuMessageId: undefined,
         management: undefined,
       },
     });
-    return replyAndRemember(updated, to, noListings(language), language, sellerMenuButtons(language));
+    const emptyBody = noListings(language);
+    const delivery = await sender.reply(to, emptyBody, language, sellerMenuButtons(language));
+    const sellerMenuMessageId = delivery.interactive?.ok
+      ? delivery.interactive.messageId
+      : undefined;
+    const updated = await saveSession(pending.phone, {
+      draft: { ...currentDraft(pending), sellerMenuMessageId },
+    });
+    return rememberAssistantReply(updated, emptyBody);
   }
 
   const current = currentManagement(session);
