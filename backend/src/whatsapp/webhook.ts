@@ -192,10 +192,8 @@ export async function processVerifiedWebhookPayload(
     }
   }
 
-  for (const message of parsed.messages) {
-    if (!options.deduper.addIfAbsent(message.id)) {
-      continue;
-    }
+  await Promise.all(parsed.messages.map(async (message) => {
+    if (!options.deduper.addIfAbsent(message.id)) return;
 
     try {
       await options.onMessage(message);
@@ -204,7 +202,7 @@ export async function processVerifiedWebhookPayload(
       // sibling message in the same Meta envelope.
       log(options.logger, `message handler failed (${failureReason(error)})`);
     }
-  }
+  }));
 }
 
 function failureReason(error: unknown): string {
