@@ -294,6 +294,31 @@ export async function getSellerProduct(
 }
 
 /**
+ * Reads an image only when it belongs to the seller's own selected listing.
+ * This keeps product-photo analysis private to the listing owner rather than
+ * accepting a public media URL or an arbitrary image identifier.
+ */
+export async function getSellerProductImage(
+  phone: string,
+  id: string,
+): Promise<StoredImage | null> {
+  const parsedPhone = SellerPhoneSchema.safeParse(phone);
+  const parsedId = ProductIdSchema.safeParse(id);
+  if (!parsedPhone.success || !parsedId.success) return null;
+
+  const rows = await sql<{ id: string; mime: string; bytes: Uint8Array }[]>`
+    select i.id::text as id, i.mime, i.bytes
+    from products p
+    join sellers s on s.id = p.seller_id
+    join images i on i.id = p.image_id
+    where s.phone = ${parsedPhone.data}
+      and p.id = ${parsedId.data}::uuid
+    limit 1
+  `;
+  return rows[0] ?? null;
+}
+
+/**
  * Updates one seller-owned product after strict validation. A missing row,
  * different owner, malformed patch, or unknown image all return null without
  * leaking which condition failed or changing another seller's product.
