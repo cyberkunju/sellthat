@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link, usePathname } from "./lib/router";
+import { TryNow } from "./components/TryNow";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
 import { Product } from "./pages/Product";
@@ -91,6 +92,8 @@ export default function App(): JSX.Element {
           <p>Made for local sellers across India.</p>
         </div>
       </footer>
+
+      <TryNow />
     </div>
   );
 }
