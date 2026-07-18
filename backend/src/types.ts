@@ -15,6 +15,23 @@ export const LANGUAGE_CODES = [
 export type LanguageCode = (typeof LANGUAGE_CODES)[number];
 
 export type SellerRole = "seller" | "buyer";
+export const PRODUCT_STATUSES = ["active", "sold_out", "archived"] as const;
+export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
+
+/**
+ * Fields a seller may change on one of their own published products.
+ * Undefined leaves a value unchanged; imageId: null removes its image.
+ */
+export interface SellerProductPatch {
+  title?: string;
+  description?: string;
+  price?: number;
+  quantity?: number;
+  category?: string;
+  imageId?: string | null;
+  status?: ProductStatus;
+}
+
 export type ConversationStage =
   | "new"
   | "lang"
@@ -36,12 +53,36 @@ export interface DraftListing {
   confirmationReady?: boolean;
   /** Meta id of the exact outbound confirmation interactive message. */
   confirmationMessageId?: string;
+  /** Meta id of the exact outbound Verify interactive message. */
+  verificationMessageId?: string;
   /**
    * Set by deterministic copy after asking for the next missing hard fact.
    * It lets a bare numeric reply be interpreted only in that unambiguous
    * follow-up turn; the model can never set this field.
    */
   expectedHardFact?: "price" | "quantity";
+  /**
+   * Deterministic context for a seller's post-publish management flow.
+   * Only button/context handlers may set these values; the model never does.
+   */
+  management?: {
+    productListMessageId?: string;
+    /** Zero-based page for a long seller-owned listing picker. */
+    productListPage?: number;
+    actionListMessageId?: string;
+    confirmationMessageId?: string;
+    selectedProductId?: string;
+    action?:
+      | "edit_price"
+      | "edit_quantity"
+      | "edit_details"
+      | "replace_photo"
+      | "archive"
+      | "restore"
+      | "sold_out"
+      | "restock";
+    pendingPatch?: SellerProductPatch;
+  };
 }
 
 export interface HistoryTurn {
@@ -78,7 +119,9 @@ export interface PublicProduct {
   imageUrl: string | null;
   sellerName: string | null;
   sellerLocation: string | null;
+  status: ProductStatus;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface StoredImage {

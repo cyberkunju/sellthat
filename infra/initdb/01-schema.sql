@@ -30,10 +30,18 @@ create table if not exists products (
   seller_name text,
   seller_location text,
   language text check (language is null or language in ('en-IN', 'hi-IN', 'bn-IN', 'te-IN', 'mr-IN', 'ta-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'pa-IN', 'or-IN')),
-  created_at timestamptz not null default now()
+  status text not null default 'active',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint products_status_check check (status in ('active', 'sold_out', 'archived'))
 );
 
 create index if not exists products_created_at_idx on products (created_at desc);
+create index if not exists products_public_created_at_idx
+  on products (created_at desc)
+  where status in ('active', 'sold_out');
+create index if not exists products_seller_updated_at_idx
+  on products (seller_id, updated_at desc);
 
 create table if not exists sessions (
   phone text primary key,

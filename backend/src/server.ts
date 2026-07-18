@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { handleInboundMessage } from "./agent";
 import { config, configSummary } from "./config";
+import { runProductSchemaMigrations } from "./migrations";
 import { getImage, getProduct, listProducts } from "./products";
 import { createWhatsAppWebhookRouter } from "./whatsapp/webhook";
 
@@ -69,11 +70,21 @@ app.onError((error, context) => {
   return context.json({ error: "Internal server error" }, 500);
 });
 
-console.info("SellThat backend starting", configSummary());
+async function startServer(): Promise<void> {
+  await runProductSchemaMigrations();
 
-Bun.serve({
-  port: config.port,
-  fetch: app.fetch,
+  console.info("SellThat backend starting", configSummary());
+
+  Bun.serve({
+    port: config.port,
+    fetch: app.fetch,
+  });
+}
+
+void startServer().catch((error: unknown) => {
+  const reason = error instanceof Error && error.name ? error.name : "unknown";
+  console.error(`[server] database migration failed (${reason})`);
+  process.exit(1);
 });
 
 export { app };
