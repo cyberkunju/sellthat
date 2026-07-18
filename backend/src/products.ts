@@ -157,6 +157,26 @@ export async function markSellerVerified(phone: string): Promise<Seller | null> 
   return rows[0] ? asSeller(rows[0]) : null;
 }
 
+/**
+ * Demo reset for one seller: clear their verified state and remove all of
+ * their published products, so the next onboarding starts from a clean slate.
+ * Scoped to a single phone and triggered only by that seller's explicit reset.
+ */
+export async function resetSellerData(phone: string): Promise<void> {
+  await sql.begin(async (transaction) => {
+    const rows = await transaction<{ id: string }[]>`
+      update sellers
+      set is_verified = false, updated_at = now()
+      where phone = ${phone}
+      returning id::text as id
+    `;
+    const seller = rows[0];
+    if (seller) {
+      await transaction`delete from products where seller_id = ${seller.id}::uuid`;
+    }
+  });
+}
+
 export async function storeImage(bytes: Uint8Array, mime: string): Promise<string> {
   const rows = await sql<{ id: string }[]>`
     insert into images (mime, bytes)

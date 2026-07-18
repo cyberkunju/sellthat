@@ -38,10 +38,17 @@ import {
   listSellerProducts,
   markSellerVerified,
   publishSessionDraft,
+  resetSellerData,
   storeImage,
   updateSellerProduct,
 } from "./products";
-import { appendHistory, getSession, saveSession, type Session } from "./session";
+import {
+  appendHistory,
+  deleteSession,
+  getSession,
+  saveSession,
+  type Session,
+} from "./session";
 import type {
   DraftListing,
   PublicProduct,
@@ -369,6 +376,51 @@ function explicitLanguageFromText(content: string): LanguageCode | null {
 
 function isReset(content: string): boolean {
   return /^(?:reset|start over|restart|फिर से शुरू|रीसेट)$/iu.test(content.trim());
+}
+
+const HEARD_LABELS: Record<LanguageCode, string> = {
+  "en-IN": "🗣️ You said",
+  "hi-IN": "🗣️ आपने कहा",
+  "bn-IN": "🗣️ আপনি বলেছেন",
+  "te-IN": "🗣️ మీరు చెప్పారు",
+  "mr-IN": "🗣️ तुम्ही म्हणालात",
+  "ta-IN": "🗣️ நீங்கள் சொன்னது",
+  "gu-IN": "🗣️ તમે કહ્યું",
+  "kn-IN": "🗣️ ನೀವು ಹೇಳಿದ್ದು",
+  "ml-IN": "🗣️ നിങ്ങൾ പറഞ്ഞത്",
+  "pa-IN": "🗣️ ਤੁਸੀਂ ਕਿਹਾ",
+  "or-IN": "🗣️ ଆପଣ କହିଲେ",
+};
+
+/**
+ * A plain-text echo of a voice note's transcription so the seller can confirm
+ * we heard them correctly. Sent as its own message before the actual reply so
+ * the spoken reply (TTS) is not polluted with the seller's own words.
+ */
+function heardEcho(language: LanguageCode, transcript: string): string {
+  return `${HEARD_LABELS[language]}:\n“${transcript}”`;
+}
+
+/**
+ * The verification prompt used when no community invite is configured. It keeps
+ * the explicit "Verify me" tap (so the demo shows the real step) but drops the
+ * join-a-community line, so the seller flow never dead-ends waiting on a link.
+ */
+function verifyNoLinkPrompt(language: LanguageCode): string {
+  const prompts: Record<LanguageCode, string> = {
+    "en-IN": "You're one tap away from selling. Tap Verify me to start listing your products.",
+    "hi-IN": "बेचना बस एक टैप दूर है। अपने उत्पाद सूचीबद्ध करना शुरू करने के लिए Verify me दबाएँ।",
+    "bn-IN": "বিক্রি করা মাত্র এক ট্যাপ দূরে। পণ্য তালিকাভুক্ত করা শুরু করতে Verify me চাপুন।",
+    "te-IN": "అమ్మకం ఒక్క ట్యాప్ దూరంలో ఉంది. మీ ఉత్పత్తులను జాబితా చేయడం ప్రారంభించడానికి Verify me నొక్కండి.",
+    "mr-IN": "विक्री फक्त एक टॅप दूर आहे. तुमची उत्पादने सूचीबद्ध करण्यासाठी Verify me दाबा.",
+    "ta-IN": "விற்பனை ஒரே ஒரு தட்டு தொலைவில். உங்கள் பொருட்களைப் பட்டியலிடத் தொடங்க Verify me அழுத்துங்கள்.",
+    "gu-IN": "વેચાણ ફક્ત એક ટૅપ દૂર છે. તમારા ઉત્પાદનો સૂચિબદ્ધ કરવાનું શરૂ કરવા Verify me દબાવો.",
+    "kn-IN": "ಮಾರಾಟ ಒಂದೇ ಟ್ಯಾಪ್ ದೂರದಲ್ಲಿದೆ. ನಿಮ್ಮ ಉತ್ಪನ್ನಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು Verify me ಒತ್ತಿ.",
+    "ml-IN": "വിൽപ്പന ഒരൊറ്റ ടാപ്പ് അകലെയാണ്. നിങ്ങളുടെ ഉൽപ്പന്നങ്ങൾ ലിസ്റ്റ് ചെയ്യാൻ Verify me അമർത്തൂ.",
+    "pa-IN": "ਵੇਚਣਾ ਬੱਸ ਇੱਕ ਟੈਪ ਦੂਰ ਹੈ। ਆਪਣੇ ਉਤਪਾਦ ਸੂਚੀਬੱਧ ਕਰਨਾ ਸ਼ੁਰੂ ਕਰਨ ਲਈ Verify me ਦਬਾਓ।",
+    "or-IN": "ବିକ୍ରି କେବଳ ଗୋଟିଏ ଟ୍ୟାପ୍ ଦୂରରେ। ଆପଣଙ୍କ ପଦାର୍ଥ ତାଲିକାଭୁକ୍ତ କରିବା ଆରମ୍ଭ କରିବାକୁ Verify me ଦବାନ୍ତୁ।",
+  };
+  return prompts[language];
 }
 
 function missingDraftReply(language: LanguageCode, draft: DraftListing): string {
@@ -1729,18 +1781,12 @@ async function beginSellerFlow(
     role: "seller",
     language,
   });
-  if (!hasConfiguredCommunityLink()) {
-    console.warn("[agent] seller verification is blocked until COMMUNITY_LINK is configured");
-    await replyAndRemember(verificationSession, to, communityUnavailableReply(language), language);
-    return;
-  }
-
-  await sendVerificationAndRemember(
-    verificationSession,
-    to,
-    language,
-    localizedText(language, "verifyPrompt", { communityLink: config.communityLink }),
-  );
+  // Without a configured community invite we skip the join step but still keep
+  // the explicit "Verify me" tap, so the demo flow never dead-ends.
+  const verifyBody = hasConfiguredCommunityLink()
+    ? localizedText(language, "verifyPrompt", { communityLink: config.communityLink })
+    : verifyNoLinkPrompt(language);
+  await sendVerificationAndRemember(verificationSession, to, language, verifyBody);
 }
 
 /**
@@ -1777,20 +1823,24 @@ async function processInboundMessage(message: InboundMessage): Promise<void> {
       return;
     }
 
+    // Echo the transcription of any voice note back to the seller first, so
+    // they can see exactly what we heard before the actual reply arrives.
+    if (message.type === "audio" && turn.content.trim().length > 0) {
+      await sender.sendText(message.from, heardEcho(language, turn.content.trim()));
+    }
+
     if (message.type === "unknown") {
       if (session.stage === "done" && session.role === "buyer") {
         await replyAndRemember(session, message.from, localizedText(language, "buyerSoon"), language);
       } else if (session.stage === "verify_gate") {
-        if (!hasConfiguredCommunityLink()) {
-          await replyAndRemember(session, message.from, communityUnavailableReply(language), language);
-        } else {
-          await sendVerificationAndRemember(
-            session,
-            message.from,
-            language,
-            localizedText(language, "verifyAgain"),
-          );
-        }
+        await sendVerificationAndRemember(
+          session,
+          message.from,
+          language,
+          hasConfiguredCommunityLink()
+            ? localizedText(language, "verifyAgain")
+            : verifyNoLinkPrompt(language),
+        );
       } else if (session.stage === "role") {
         await replyAndRemember(session, message.from, localizedText(language, "chooseRole"), language, roleButtons(language));
       } else if (session.stage === "selling") {
@@ -1802,12 +1852,12 @@ async function processInboundMessage(message: InboundMessage): Promise<void> {
     }
 
     if (isReset(turn.content)) {
-      if (session.role === "buyer") {
-        await replyAndRemember(session, message.from, localizedText(language, "buyerSoon"), language);
-        return;
-      }
-      const updated = await saveSession(message.from, { draft: {}, stage: seller.isVerified ? "selling" : session.stage });
-      await replyAndRemember(updated, message.from, localizedText(language, "reset"), language);
+      // Full demo reset: wipe the session and this seller's data so the very
+      // next message ("hi") starts onboarding from scratch. Sent without
+      // rememberAssistantReply so no session row is recreated behind it.
+      await deleteSession(message.from);
+      await resetSellerData(message.from);
+      await sender.reply(message.from, localizedText(language, "reset"), language);
       return;
     }
 
@@ -1870,10 +1920,6 @@ async function processInboundMessage(message: InboundMessage): Promise<void> {
     }
 
     if (session.stage === "verify_gate") {
-      if (!hasConfiguredCommunityLink()) {
-        await replyAndRemember(session, message.from, communityUnavailableReply(language), language);
-        return;
-      }
       const draft = currentDraft(session);
       const validVerificationTap =
         message.buttonId === "verify_yes" &&
